@@ -3,6 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import kuerzel from './migrationen/002-kuerzel.sql';
 import modulKategorien from './migrationen/003-modul-kategorien.sql';
 import nutzerdaten from './migrationen/004-nutzerdaten.sql';
+import modulAngaben from './migrationen/005-modul-angaben.sql';
 import schema from './schema.sql';
 
 export const DATENBANK_NAME = 'uniplaner.db';
@@ -21,9 +22,10 @@ const UPGRADES: Readonly<Record<number, string>> = {
   2: kuerzel,
   3: modulKategorien,
   4: nutzerdaten,
+  5: modulAngaben,
 };
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /** Für `SQLiteProvider onInit`: Verbindung einstellen und Schema auf den neuesten Stand bringen. */
 export async function migriere(db: Db): Promise<void> {

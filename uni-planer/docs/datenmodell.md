@@ -1,6 +1,6 @@
 # Datenmodell
 
-Quelle der Wahrheit für das Schema ist [`src/db/schema.sql`](../src/db/schema.sql) (aktueller Stand, Version 4; bestehende Installationen werden über [`src/db/migrationen/`](../src/db/migrationen/) aktualisiert), für Typen und Kernregeln [`src/model/types.ts`](../src/model/types.ts).
+Quelle der Wahrheit für das Schema ist [`src/db/schema.sql`](../src/db/schema.sql) (aktueller Stand, Version 5; bestehende Installationen werden über [`src/db/migrationen/`](../src/db/migrationen/) aktualisiert), für Typen und Kernregeln [`src/model/types.ts`](../src/model/types.ts).
 
 ## Tabellen
 
@@ -20,6 +20,8 @@ erDiagram
         INTEGER vorlesungen_ausgeblendet
         INTEGER uebungen_ausgeblendet "sonstige Veranstaltungen"
         INTEGER abgaben_ausgeblendet
+        TEXT klausurtermine "Freitext, vom Nutzer"
+        TEXT zulassungskriterien "Freitext, vom Nutzer"
     }
     event {
         TEXT id PK "erste UID oder manuell:uuid"

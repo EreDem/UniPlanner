@@ -242,13 +242,18 @@ export function istErledigt(typ: EventTyp, status: Status): boolean {
  * Moodle entfernte Vorlesungen (z. B. ausgefallene Termine). Entfernte Abgaben bleiben sichtbar,
  * damit eine verschwundene Frist nicht unbemerkt untergeht.
  */
+/** Moodle-Event vor dem Startdatum? Solche Events zeigt die App nirgends an. */
+export function istVorStartdatum(event: UniEvent, einstellungen: Einstellungen): boolean {
+  const startdatum = einstellungen.startdatumMs;
+  return startdatum !== null && event.quelle === 'moodle' && event.startMs < startdatum;
+}
+
 function sichtbareEintraege(eingabe: ToDoEingabe): ToDoEintrag[] {
   const { einstellungen, jetztMs } = eingabe;
   const modulNachId = new Map(eingabe.module.map((modul) => [modul.id, modul]));
-  const startdatum = einstellungen.startdatumMs;
 
   return eingabe.events.flatMap((event) => {
-    if (startdatum !== null && event.quelle === 'moodle' && event.startMs < startdatum) return [];
+    if (istVorStartdatum(event, einstellungen)) return [];
     if (event.ausgeblendet) return [];
     const modul = event.modulId ? (modulNachId.get(event.modulId) ?? null) : null;
     if (modul && (modul.ausgeblendet || modul.ausgeblendeteKategorien[kategorieVon(event)])) return [];

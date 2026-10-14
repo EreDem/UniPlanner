@@ -33,7 +33,7 @@ import { formatiere } from '@/zeit';
 const GESTAPELTE_BEREICHE: readonly BereichSchluessel[] = ['nachzuarbeiten', 'erledigte-vorlesungen'];
 
 /** Kurze, eindeutige Bezeichnung für Statusauswahl und Rückgängig-Leiste, z. B. „Analysis · Mo 05.10.“. */
-function bezeichnung({ event, modul }: ToDoEintrag): string {
+export function bezeichnung({ event, modul }: ToDoEintrag): string {
   const titel = anzeigeTitel(event);
   if (titel !== 'Vorlesung' || !modul) return titel;
   return `${modul.name} · ${formatiere(event.startMs, 'EEEEEE dd.MM.')}`;

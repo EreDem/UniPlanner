@@ -20,6 +20,11 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Icon sf="checkmark.circle" md="task_alt" />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="module">
+        <NativeTabs.Trigger.Label>Module</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="books.vertical" md="school" />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="einstellungen">
         <NativeTabs.Trigger.Label>Einstellungen</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="gearshape" md="settings" />

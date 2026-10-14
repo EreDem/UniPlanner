@@ -4,9 +4,11 @@
 import { migriere, SCHEMA_VERSION, type Db } from '@/db/db';
 import {
   ladeAbrufInfo,
+  ladeAlleNutzerdaten,
   ladeEinstellungen,
   ladeEvent,
   ladeEvents,
+  ladeModulAngaben,
   ladeModule,
   ladeNutzerdaten,
   ladeStatus,
@@ -21,6 +23,7 @@ import {
   setzeStatus,
   speichereEinstellungen,
   speichereImport,
+  speichereModulAngabe,
   speichereNotiz,
   speicherePunkte,
 } from '@/db/repository';
@@ -96,6 +99,12 @@ async function importiere(db: Db, roh: RohEvent[] = ROH, jetzt = JETZT) {
     expect(await ladeNutzerdaten(db, uid(2008))).toEqual({ notiz: 'Aufgabe 3 mit Lisa', erreicht: 7.5, max: 10 });
     expect(await ladeNutzerdaten(db, uid(2001))).toEqual({ notiz: 'Folien 12–20', erreicht: null, max: null });
     expect(await ladeNutzerdaten(db, uid(2010))).toEqual({ notiz: null, erreicht: null, max: null });
+    expect(await ladeAlleNutzerdaten(db)).toEqual(
+      new Map([
+        [uid(2008), { notiz: 'Aufgabe 3 mit Lisa', erreicht: 7.5, max: 10 }],
+        [uid(2001), { notiz: 'Folien 12–20', erreicht: null, max: null }],
+      ]),
+    );
   });
 
   it('ändert Notiz und Punkte unabhängig voneinander', async () => {
@@ -134,6 +143,25 @@ async function importiere(db: Db, roh: RohEvent[] = ROH, jetzt = JETZT) {
     await speicherePunkte(db, uid(2008), { erreicht: 1, max: 2 });
     await loescheAlleDaten(db);
     expect(await anzahl(db, 'nutzerdaten')).toBe(0);
+  });
+
+  it('speichert Klausurtermine und Zulassungskriterien pro Modul, unberührt vom Import', async () => {
+    await importiere(db);
+    expect(await ladeModulAngaben(db, 'analysis')).toEqual({ klausurtermine: null, zulassungskriterien: null });
+
+    await speichereModulAngabe(db, 'analysis', 'klausurtermine', '1. Termin 12.02., 2. Termin 20.03.');
+    await speichereModulAngabe(db, 'analysis', 'zulassungskriterien', '50 % der Übungspunkte');
+    await speichereModulAngabe(db, 'datenbanken', 'zulassungskriterien', 'x'.repeat(150));
+    await importiere(db);
+
+    expect(await ladeModulAngaben(db, 'analysis')).toEqual({
+      klausurtermine: '1. Termin 12.02., 2. Termin 20.03.',
+      zulassungskriterien: '50 % der Übungspunkte',
+    });
+    expect((await ladeModulAngaben(db, 'datenbanken')).zulassungskriterien).toHaveLength(100);
+
+    await speichereModulAngabe(db, 'analysis', 'klausurtermine', '   ');
+    expect((await ladeModulAngaben(db, 'analysis')).klausurtermine).toBeNull();
   });
 
   it('blendet Kategorien eines Moduls einzeln aus, ohne dass der Import das ändert', async () => {

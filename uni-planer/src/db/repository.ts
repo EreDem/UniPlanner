@@ -1,7 +1,13 @@
 // Alle Lese- und Schreibzugriffe auf die Datenbank.
 
 import { slug, type ImportErgebnis } from '@/import/verarbeite';
-import { MAX_NOTIZ_ZEICHEN, type Punkte } from '@/model/angaben';
+import {
+  MAX_MODUL_ANGABE_ZEICHEN,
+  MAX_NOTIZ_ZEICHEN,
+  type ModulAngabe,
+  type ModulAngaben,
+  type Punkte,
+} from '@/model/angaben';
 import {
   STANDARD_EINSTELLUNGEN,
   type Einstellungen,
@@ -157,6 +163,22 @@ export async function ladeNutzerdaten(db: Db, eventId: string): Promise<Nutzerda
   };
 }
 
+/** Notizen und Punkte aller Events, für Auswertungen wie die Punktesumme pro Modul. */
+export async function ladeAlleNutzerdaten(db: Db): Promise<Map<string, Nutzerdaten>> {
+  const zeilen = await db.getAllAsync<{
+    event_id: string;
+    notiz: string | null;
+    punkte_erreicht: number | null;
+    punkte_max: number | null;
+  }>('SELECT event_id, notiz, punkte_erreicht, punkte_max FROM nutzerdaten');
+  return new Map(
+    zeilen.map((zeile) => [
+      zeile.event_id,
+      { notiz: zeile.notiz, erreicht: zeile.punkte_erreicht, max: zeile.punkte_max },
+    ]),
+  );
+}
+
 /** Speichert die Notiz (leer → `null`). Längere Texte als erlaubt werden gekürzt. */
 export async function speichereNotiz(db: Db, eventId: string, notiz: string, jetztMs = Date.now()): Promise<void> {
   const wert = notiz === '' ? null : notiz.slice(0, MAX_NOTIZ_ZEICHEN);
@@ -228,6 +250,25 @@ export async function setzeKategorieAusgeblendet(
   ausgeblendet: boolean,
 ): Promise<void> {
   await db.runAsync(`UPDATE modul SET ${KATEGORIE_SPALTE[kategorie]} = ? WHERE id = ?`, [ausgeblendet ? 1 : 0, modulId]);
+}
+
+export async function ladeModulAngaben(db: Db, modulId: string): Promise<ModulAngaben> {
+  const zeile = await db.getFirstAsync<ModulAngaben>(
+    'SELECT klausurtermine, zulassungskriterien FROM modul WHERE id = ?',
+    [modulId],
+  );
+  return { klausurtermine: zeile?.klausurtermine ?? null, zulassungskriterien: zeile?.zulassungskriterien ?? null };
+}
+
+const MODUL_ANGABE_SPALTE: Record<ModulAngabe, string> = {
+  klausurtermine: 'klausurtermine',
+  zulassungskriterien: 'zulassungskriterien',
+};
+
+/** Speichert Klausurtermine oder Zulassungskriterien eines Moduls (leer → `null`, zu lang → gekürzt). */
+export async function speichereModulAngabe(db: Db, modulId: string, angabe: ModulAngabe, text: string): Promise<void> {
+  const wert = text.trim() === '' ? null : text.slice(0, MAX_MODUL_ANGABE_ZEICHEN);
+  await db.runAsync(`UPDATE modul SET ${MODUL_ANGABE_SPALTE[angabe]} = ? WHERE id = ?`, [wert, modulId]);
 }
 
 /** Legt ein Modul per Name an. Gibt es den Slug schon, wird das vorhandene Modul verwendet. */

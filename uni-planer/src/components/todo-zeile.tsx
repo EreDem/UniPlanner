@@ -14,6 +14,7 @@ export function ToDoZeile({
   onPress,
   onStatusPress,
   anzahl,
+  zusatz,
 }: {
   eintrag: ToDoEintrag;
   bereich: BereichSchluessel;
@@ -22,6 +23,8 @@ export function ToDoZeile({
   onStatusPress?: () => void;
   /** Für Stapel: rechts die Anzahl statt des Status-Badges. */
   anzahl?: number;
+  /** Zusätzliche Zeile unter den Details, z. B. die Punkte einer Abgabe. */
+  zusatz?: string;
 }) {
   const theme = useTheme();
   const schema = useSchema();
@@ -67,6 +70,7 @@ export function ToDoZeile({
         <Text style={[styles.details, { color: ueberfaellig ? theme.gefahr : theme.textSecondary }]}>
           {details}
         </Text>
+        {zusatz && <Text style={[styles.details, { color: theme.text }]}>{zusatz}</Text>}
         {event.entferntMs !== null && (
           <Text style={[styles.details, { color: theme.warnungText }]}>Aus Moodle entfernt</Text>
         )}

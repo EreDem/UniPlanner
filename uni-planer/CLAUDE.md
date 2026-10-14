@@ -32,9 +32,11 @@ Open Source unter AGPL-3.0. Kommunikation, Doku und Bezeichner im Code sind auf 
 ## Projektstruktur
 
 ```
-src/app/                Screens (Expo Router): Onboarding, (tabs)/To-do + Erledigt + Einstellungen, event/[id], neues-event
+src/app/                Screens (Expo Router): Onboarding, (tabs)/To-do + Erledigt + Module + Einstellungen,
+                        event/[id], modul/[id], neues-event
 src/model/types.ts      Typen und Kernregeln (rein, ohne Expo)
-src/model/angaben.ts    Notiz und Punkte: Grenzen, Eingabe prüfen (rein)
+src/model/angaben.ts    Notiz und Punkte: Grenzen, Eingabe prüfen, Punktesumme (rein)
+src/model/modul-uebersicht.ts  Modulseite: Events nach Kategorie, Punkte pro Modul (rein)
 src/zeit.ts             Formatierung und Tagesgrenzen in Europe/Berlin (rein)
 src/import/             abruf.ts, parse.ts, verarbeite.ts (rein), importiere.ts (Orchestrierung)
 src/db/                 schema.sql (vollständiges aktuelles Schema für neue Installationen), migrationen/ (Upgrades
@@ -100,9 +102,13 @@ Anzeige: Moodle-Vorlesungen heißen überall „Vorlesung“ (`anzeigeTitel`), w
 
 In der Detailansicht jedes Events gibt es eine Notiz (höchstens 50 Zeichen, Zähler „n / 50“), bei Abgaben zusätzlich Punkte („erreicht / maximal“). Gespeichert wird beim Tippen in der Tabelle `nutzerdaten`. Punkte sind Zahlen (`REAL`, Eingabe mit Komma oder Punkt, höchstens zwei Nachkommastellen), damit sie später ausgewertet werden können (z. B. Zulassungs-Tracking pro Modul). Erreicht darf größer als maximal sein (Bonuspunkte), maximal muss größer als 0 sein; ungültige Eingaben werden nicht gespeichert. Regeln in `src/model/angaben.ts`.
 
+## Module-Tab
+
+Listet alle belegten Module (nicht komplett ausgeblendet) mit Kurzübersicht und Punkteanteil. Antippen öffnet die Modulseite (`modul/[id]`): oben zwei einzeilige Freitextfelder „Klausurtermine“ und „Zulassungskriterien“ (je höchstens 100 Zeichen, Spalten in `modul`, ein Import fasst sie nie an), darunter alle bisherigen Events des Moduls (begonnen bzw. Frist erreicht), aufklappbar nach Vorlesungen, Abgaben und Übungen (immer alle drei, auch leere), jeweils älteste zuerst. Die Ausblende-Schalter für Kategorien gelten hier nicht (nur für die To-do-Liste), das Startdatum schon. Bei den Abgaben stehen die Gesamtpunkte (erzielt, möglich, Prozent), auch zugeklappt; eingerechnet werden nur Abgaben mit beiden Punktwerten. Logik in `src/model/modul-uebersicht.ts`.
+
 ## Erledigt-Tab
 
-Drei Tabs: To-do, Erledigt, Einstellungen. Der Erledigt-Tab zeigt abgegebene Abgaben und erledigte Vorlesungen, neueste zuerst. Erledigte Vorlesungen werden wie unter „Nachzuarbeiten“ pro Modul gestapelt (Zeile zeigt die neueste, Popup neueste zuerst). Heutige Vorlesungen erscheinen dort erst ab dem nächsten Tag (bis dahin stehen sie unter „Heute“), Vorlesungen, die nur über den Standard `erledigt` sind, erst nach ihrem Ende. Verschwindet ein Eintrag durch eine Statusänderung aus einer der beiden Listen (also nicht unter „Heute“), erscheint unten für 5 Sekunden eine Leiste mit „Rückgängig“; sie stellt den vorher gespeicherten Status wieder her (oder den Standard, wenn keiner gespeichert war).
+Vier Tabs: To-do, Erledigt, Module, Einstellungen. Der Erledigt-Tab zeigt abgegebene Abgaben und erledigte Vorlesungen, neueste zuerst. Erledigte Vorlesungen werden wie unter „Nachzuarbeiten“ pro Modul gestapelt (Zeile zeigt die neueste, Popup neueste zuerst). Heutige Vorlesungen erscheinen dort erst ab dem nächsten Tag (bis dahin stehen sie unter „Heute“), Vorlesungen, die nur über den Standard `erledigt` sind, erst nach ihrem Ende. Verschwindet ein Eintrag durch eine Statusänderung aus einer der beiden Listen (also nicht unter „Heute“), erscheint unten für 5 Sekunden eine Leiste mit „Rückgängig“; sie stellt den vorher gespeicherten Status wieder her (oder den Standard, wenn keiner gespeichert war).
 
 ## MVP-Umfang
 
@@ -113,7 +119,7 @@ Drin:
 - Einstellungen (s. o.)
 - Manuelle Events als Fallback
 
-Bewusst nicht im MVP: Kategorie „Sonstiges“, Export/Sync in andere Apps, Zulassungs-Tracking, Klausurtermine, Benachrichtigungen, geteilte Kursdaten, ML-Features.
+Bewusst nicht im MVP: Kategorie „Sonstiges“, Export/Sync in andere Apps, automatisches Zulassungs-Tracking und Klausurtermine aus Moodle (im MVP nur als Freitext pro Modul), Benachrichtigungen, geteilte Kursdaten, ML-Features.
 
 ## Reihenfolge in Phase 3
 

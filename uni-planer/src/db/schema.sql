@@ -1,5 +1,5 @@
 
--- SQLite-Schema des Uni-Planers (expo-sqlite), aktueller Stand = Version 4.
+-- SQLite-Schema des Uni-Planers (expo-sqlite), aktueller Stand = Version 5.
 -- Neue Installationen führen diese Datei aus; bestehende werden über src/db/migrationen/ aktualisiert
 -- (siehe src/db/db.ts, PRAGMA user_version). Änderungen hier immer auch als Migration anlegen.
 -- Zeitpunkte sind UTC-Millisekunden, Spalten enden auf _ms. Wahrheitswerte sind 0/1.
@@ -16,7 +16,10 @@ CREATE TABLE modul (
   -- Einzelne Kategorien des Moduls ausblenden, vom Nutzer (seit Version 3):
   vorlesungen_ausgeblendet INTEGER NOT NULL DEFAULT 0,
   uebungen_ausgeblendet    INTEGER NOT NULL DEFAULT 0,   -- sonstige Veranstaltungen (Übung, Tutorium …)
-  abgaben_ausgeblendet     INTEGER NOT NULL DEFAULT 0
+  abgaben_ausgeblendet     INTEGER NOT NULL DEFAULT 0,
+  -- Eigene Angaben als freier Text, vom Nutzer (seit Version 5):
+  klausurtermine           TEXT,
+  zulassungskriterien      TEXT
 );
 
 -- Ein Event nach Deduplizierung. Mehrere Moodle-UIDs können auf dasselbe Event zeigen.
