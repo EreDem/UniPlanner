@@ -149,6 +149,36 @@ describe('baueModulUebersicht', () => {
     expect(anzahlIn(uebersicht, 'uebungen')).toBe(0);
   });
 
+  it('zeigt vor der Frist abgegebene Abgaben samt Punkten', () => {
+    const uebersicht = baueModulUebersicht(
+      eingabe([abgabe('frueh-abgegeben', 26), abgabe('noch-offen', 27), event('vl-heute-abgehakt', 20, { startMs: zeit(20, 16), endeMs: zeit(20, 18) })], {
+        status: new Map<string, Status>([
+          ['frueh-abgegeben', 'abgegeben'],
+          ['vl-heute-abgehakt', 'erledigt'],
+        ]),
+      }),
+      modul('analysis'),
+      new Map<string, Punkte>([['frueh-abgegeben', { erreicht: 9, max: 10 }]]),
+    );
+    expect(ids(uebersicht)).toEqual({
+      vorlesungen: ['vl-heute-abgehakt'],
+      abgaben: ['frueh-abgegeben'],
+      uebungen: [],
+    });
+    expect(uebersicht.punkte).toEqual({ erreicht: 9, max: 10, prozent: 90, bewertet: 1 });
+  });
+
+  it('zeigt künftige Vorlesungen nicht, nur weil sie per Standard erledigt sind', () => {
+    const uebersicht = baueModulUebersicht(
+      eingabe([event('vergangen', 15), event('kuenftig', 22)], {
+        einstellungen: { ...STANDARD_EINSTELLUNGEN, vorlesungStandard: 'erledigt' },
+      }),
+      modul('analysis'),
+      new Map(),
+    );
+    expect(ids(uebersicht).vorlesungen).toEqual(['vergangen']);
+  });
+
   it('markiert überfällige, nicht abgegebene Abgaben', () => {
     const uebersicht = baueModulUebersicht(
       eingabe([abgabe('offen', 12), abgabe('abgegeben', 13)], {

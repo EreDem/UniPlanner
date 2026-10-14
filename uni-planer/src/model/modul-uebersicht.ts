@@ -29,9 +29,12 @@ export interface ModulUebersicht {
 const KEINE_PUNKTE: Punkte = { erreicht: null, max: null };
 
 /**
- * Alle bisherigen Events des Moduls: begonnen bzw. Frist erreicht. Es fehlen ausgeblendete Events
- * (z. B. Öffnungs-Marker), Moodle-Events vor dem Startdatum und aus Moodle entfernte Vorlesungen.
- * Die Ausblende-Schalter für Module und Kategorien gelten nur für die To-do-Liste, hier nicht.
+ * Alle bisherigen Events des Moduls: begonnen bzw. Frist erreicht, oder vom Nutzer schon
+ * abgehakt (z. B. vor der Frist abgegebene Abgaben). Nur über den Standard „erledigt“ zählt nicht,
+ * sonst stünden bei dieser Einstellung alle künftigen Vorlesungen hier.
+ * Es fehlen ausgeblendete Events (z. B. Öffnungs-Marker), Moodle-Events vor dem Startdatum und
+ * aus Moodle entfernte Vorlesungen. Die Ausblende-Schalter für Module und Kategorien gelten nur
+ * für die To-do-Liste, hier nicht.
  */
 export function baueModulUebersicht(
   eingabe: ToDoEingabe,
@@ -42,11 +45,15 @@ export function baueModulUebersicht(
   const nachKategorie = new Map<Kategorie, ToDoEintrag[]>(UEBERSICHT_KATEGORIEN.map((k) => [k, []]));
 
   for (const event of eingabe.events) {
-    if (event.modulId !== modul.id || event.ausgeblendet || event.startMs > jetztMs) continue;
+    if (event.modulId !== modul.id || event.ausgeblendet) continue;
     if (istVorStartdatum(event, einstellungen)) continue;
     if (event.typ === 'vorlesung' && event.entferntMs !== null) continue;
 
-    const status = effektiverStatus(event.typ, eingabe.status.get(event.id), einstellungen);
+    const gespeichert = eingabe.status.get(event.id);
+    const schonAbgehakt = gespeichert !== undefined && istErledigt(event.typ, gespeichert);
+    if (event.startMs > jetztMs && !schonAbgehakt) continue;
+
+    const status = effektiverStatus(event.typ, gespeichert, einstellungen);
     const ueberfaellig = event.typ === 'abgabe' && !istErledigt(event.typ, status) && event.startMs < jetztMs;
     nachKategorie.get(kategorieVon(event))!.push({ event, modul, status, ueberfaellig });
   }
