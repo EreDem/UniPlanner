@@ -5,6 +5,7 @@ import {
   STANDARD_EINSTELLUNGEN,
   type Einstellungen,
   type EventTyp,
+  type Kategorie,
   type Modul,
   type Quelle,
   type Status,
@@ -145,17 +146,49 @@ interface ModulZeile {
   art: string | null;
   quelle: Quelle;
   ausgeblendet: number;
+  vorlesungen_ausgeblendet: number;
+  uebungen_ausgeblendet: number;
+  abgaben_ausgeblendet: number;
 }
+
+const KATEGORIE_SPALTE: Record<Kategorie, string> = {
+  vorlesungen: 'vorlesungen_ausgeblendet',
+  uebungen: 'uebungen_ausgeblendet',
+  abgaben: 'abgaben_ausgeblendet',
+};
 
 export async function ladeModule(db: Db): Promise<Modul[]> {
   const zeilen = await db.getAllAsync<ModulZeile>(
-    'SELECT id, name, art, quelle, ausgeblendet FROM modul ORDER BY name COLLATE NOCASE',
+    `SELECT id, name, art, quelle, ausgeblendet, vorlesungen_ausgeblendet, uebungen_ausgeblendet, abgaben_ausgeblendet
+     FROM modul ORDER BY name COLLATE NOCASE`,
   );
-  return zeilen.map((zeile) => ({ ...zeile, ausgeblendet: zeile.ausgeblendet === 1 }));
+  return zeilen.map((zeile) => ({
+    id: zeile.id,
+    name: zeile.name,
+    art: zeile.art,
+    quelle: zeile.quelle,
+    ausgeblendet: zeile.ausgeblendet === 1,
+    ausgeblendeteKategorien: {
+      vorlesungen: zeile.vorlesungen_ausgeblendet === 1,
+      uebungen: zeile.uebungen_ausgeblendet === 1,
+      abgaben: zeile.abgaben_ausgeblendet === 1,
+    },
+  }));
 }
 
+/** Ganzes Modul aus- oder einblenden; die Einstellungen der einzelnen Kategorien bleiben erhalten. */
 export async function setzeModulAusgeblendet(db: Db, id: string, ausgeblendet: boolean): Promise<void> {
   await db.runAsync('UPDATE modul SET ausgeblendet = ? WHERE id = ?', [ausgeblendet ? 1 : 0, id]);
+}
+
+/** Vorlesungen, Übungen oder Abgaben eines Moduls aus- oder einblenden. */
+export async function setzeKategorieAusgeblendet(
+  db: Db,
+  modulId: string,
+  kategorie: Kategorie,
+  ausgeblendet: boolean,
+): Promise<void> {
+  await db.runAsync(`UPDATE modul SET ${KATEGORIE_SPALTE[kategorie]} = ? WHERE id = ?`, [ausgeblendet ? 1 : 0, modulId]);
 }
 
 /** Legt ein Modul per Name an. Gibt es den Slug schon, wird das vorhandene Modul verwendet. */

@@ -1,6 +1,6 @@
 # Datenmodell
 
-Quelle der Wahrheit für das Schema ist [`src/db/schema.sql`](../src/db/schema.sql) (aktueller Stand, Version 2; bestehende Installationen werden über [`src/db/migrationen/`](../src/db/migrationen/) aktualisiert), für Typen und Kernregeln [`src/model/types.ts`](../src/model/types.ts).
+Quelle der Wahrheit für das Schema ist [`src/db/schema.sql`](../src/db/schema.sql) (aktueller Stand, Version 3; bestehende Installationen werden über [`src/db/migrationen/`](../src/db/migrationen/) aktualisiert), für Typen und Kernregeln [`src/model/types.ts`](../src/model/types.ts).
 
 ## Tabellen
 
@@ -15,7 +15,10 @@ erDiagram
         TEXT name
         TEXT art "Kürzel der zuerst importierten Kategorie"
         TEXT quelle "moodle | manuell"
-        INTEGER ausgeblendet "nur vom Nutzer"
+        INTEGER ausgeblendet "ganzes Modul, nur vom Nutzer"
+        INTEGER vorlesungen_ausgeblendet
+        INTEGER uebungen_ausgeblendet "sonstige Veranstaltungen"
+        INTEGER abgaben_ausgeblendet
     }
     event {
         TEXT id PK "erste UID oder manuell:uuid"
@@ -85,7 +88,9 @@ stateDiagram-v2
 
 Erscheint am Tag der Vorlesung unter „Heute“ (unabhängig vom Status), danach mit Status `nachzuarbeiten` unter „Nachzuarbeiten“ oder mit `erledigt` im Erledigt-Tab.
 
-Andere Veranstaltungen (Typ `vorlesung`, aber laut Titel oder Kürzel Übung, Tutorium usw., siehe `istVorlesung`) haben keinen Status: Sie erscheinen nur am selben Tag unter „Heute“.
+Andere Veranstaltungen (Typ `vorlesung`, aber laut Titel oder Kürzel Übung, Tutorium usw., siehe `istVorlesung`; in der App „Übung“) haben keinen Status: Sie erscheinen nur am selben Tag unter „Heute“.
+
+Pro Modul lassen sich Vorlesungen, Übungen und Abgaben einzeln ausblenden (`modul.*_ausgeblendet`), zusätzlich zum ganzen Modul (`modul.ausgeblendet`).
 
 ### Abgabe
 

@@ -34,8 +34,28 @@ export interface Modul {
   /** Veranstaltungsart aus dem Präfix, z. B. `VU` aus `(VU) Datenbanken`. */
   art: string | null;
   quelle: Quelle;
+  /** Ganzes Modul ausgeblendet; gilt unabhängig von `ausgeblendeteKategorien`. */
   ausgeblendet: boolean;
+  /** Einzelne Kategorien des Moduls ausgeblendet. */
+  ausgeblendeteKategorien: Readonly<Record<Kategorie, boolean>>;
 }
+
+/** Was sich pro Modul ausblenden lässt. „Übungen“ = alle Veranstaltungen außer Vorlesungen. */
+export type Kategorie = 'vorlesungen' | 'uebungen' | 'abgaben';
+
+export const KATEGORIEN: readonly Kategorie[] = ['vorlesungen', 'uebungen', 'abgaben'];
+
+export const KATEGORIE_TEXT: Record<Kategorie, string> = {
+  vorlesungen: 'Vorlesungen',
+  uebungen: 'Übungen',
+  abgaben: 'Abgaben',
+};
+
+export const KEINE_KATEGORIE_AUSGEBLENDET: Readonly<Record<Kategorie, boolean>> = {
+  vorlesungen: false,
+  uebungen: false,
+  abgaben: false,
+};
 
 export interface UniEvent {
   /** Erste UID der Gruppe (sortiert) oder `manuell:<uuid>`. */
@@ -116,10 +136,17 @@ export function istVorlesung(event: TitelInfo): boolean {
   return !KUERZEL_ANDERE_VERANSTALTUNG.has(event.kuerzel?.trim().toUpperCase() ?? '');
 }
 
-/** „Abgabe“, „Vorlesung“ oder „Veranstaltung“ (Übung, Tutorium …). */
+/** Kategorie für das Ausblenden pro Modul. */
+export function kategorieVon(event: TitelInfo): Kategorie {
+  if (event.typ === 'abgabe') return 'abgaben';
+  return istVorlesung(event) ? 'vorlesungen' : 'uebungen';
+}
+
+/** „Abgabe“, „Vorlesung“ oder „Übung“ (sammelt alle sonstigen Veranstaltungen wie Tutorien). */
 export function artText(event: TitelInfo): string {
-  if (event.typ === 'abgabe') return 'Abgabe';
-  return istVorlesung(event) ? 'Vorlesung' : 'Veranstaltung';
+  const kategorie = kategorieVon(event);
+  if (kategorie === 'abgaben') return 'Abgabe';
+  return kategorie === 'vorlesungen' ? 'Vorlesung' : 'Übung';
 }
 
 /**
@@ -210,7 +237,8 @@ export function istErledigt(typ: EventTyp, status: Status): boolean {
 
 /**
  * Sichtbare Events mit Modul und effektivem Status. Es fehlen: Moodle-Events vor dem Startdatum,
- * ausgeblendete Events, Events ausgeblendeter Module, bei „nur Abgaben“ alle Vorlesungen und aus
+ * ausgeblendete Events, Events ausgeblendeter Module oder ausgeblendeter Kategorien eines Moduls
+ * (Vorlesungen, Übungen, Abgaben), bei „nur Abgaben“ alle Vorlesungen und aus
  * Moodle entfernte Vorlesungen (z. B. ausgefallene Termine). Entfernte Abgaben bleiben sichtbar,
  * damit eine verschwundene Frist nicht unbemerkt untergeht.
  */
@@ -223,7 +251,7 @@ function sichtbareEintraege(eingabe: ToDoEingabe): ToDoEintrag[] {
     if (startdatum !== null && event.quelle === 'moodle' && event.startMs < startdatum) return [];
     if (event.ausgeblendet) return [];
     const modul = event.modulId ? (modulNachId.get(event.modulId) ?? null) : null;
-    if (modul?.ausgeblendet) return [];
+    if (modul && (modul.ausgeblendet || modul.ausgeblendeteKategorien[kategorieVon(event)])) return [];
     if (event.typ === 'vorlesung' && (einstellungen.nurAbgaben || event.entferntMs !== null)) return [];
 
     const status = effektiverStatus(event.typ, eingabe.status.get(event.id), einstellungen);

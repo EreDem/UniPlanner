@@ -46,7 +46,7 @@ docs/datenmodell.md     Diagramme (Mermaid)
 prototyp.md             Spezifikation des ersten Prototyps
 ```
 
-Schemaänderungen: immer beides anpassen, `schema.sql` und eine neue Datei in `src/db/migrationen/` (in `db.ts` als Upgrade eintragen, `SCHEMA_VERSION` erhöhen). Ein Test prüft, dass ein Upgrade denselben Stand ergibt wie eine Neuinstallation.
+Schemaänderungen: immer beides anpassen, `schema.sql` und eine neue Datei in `src/db/migrationen/` (in `db.ts` als Upgrade eintragen, `SCHEMA_VERSION` erhöhen). Ein Test prüft, dass ein Upgrade ab Version 1 (Schnappschuss `test/fixtures/schema-v1.sql`, nie ändern) denselben Stand ergibt wie eine Neuinstallation. Im Schema keine Spalten per `DROP COLUMN` entfernen: SQLite scheitert daran bei Kommentaren in `CREATE TABLE`.
 
 Tests: `npm test`. Repository-Tests laufen gegen das echte `schema.sql` mit `node:sqlite` (Node ≥ 22.5), sonst werden sie übersprungen.
 
@@ -90,6 +90,8 @@ Zeitzone: Den Berliner UTC-Offset berechnet `src/zeit.ts` selbst (EU-Sommerzeitr
    - Stapel: Hat ein Modul mehr als eine, erscheint nur eine Zeile pro Modul. Sie zeigt die älteste Vorlesung wie eine einzelne, rechts aber die Anzahl statt des Status. Antippen öffnet ein schwebendes Popup in der Mitte mit den einzelnen Vorlesungen nach Datum, im normalen Zeilen-Design. Vorlesungen ohne Modul werden nicht gestapelt.
 
 Einstellungen: Vorlesungen standardmäßig `erledigt`, oder nur Abgaben anzeigen.
+
+Module ausblenden (Einstellungen → Module): Der Schalter am Modul blendet das ganze Modul aus. Aufgeklappt (Pfeil) lassen sich die Kategorien einzeln ausblenden: Vorlesungen, Übungen, Abgaben (`kategorieVon`). „Übungen“ heißt in der App alles, was keine Vorlesung ist (Übung, Tutorium, Praktikum …), vorläufiger Name. Ist das ganze Modul aus, bleiben die Kategorie-Schalter erhalten, sind aber ausgegraut. Gilt für To-do-Liste und Erledigt-Tab; ein Import ändert nichts daran.
 
 Anzeige: Moodle-Vorlesungen heißen überall „Vorlesung“ (`anzeigeTitel`), weil ihr Moodle-Titel meist nur der Kursname ist, der schon als Modul darübersteht. Andere Veranstaltungen (z. B. „Tutorium“) und manuelle Events behalten ihren Titel.
 

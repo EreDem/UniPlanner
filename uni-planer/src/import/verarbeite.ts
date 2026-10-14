@@ -3,6 +3,7 @@
 import {
   duplikatSchluessel,
   istOeffnungsMarker,
+  KEINE_KATEGORIE_AUSGEBLENDET,
   klassifiziere,
   type Modul,
   type RohEvent,
@@ -50,7 +51,12 @@ export function verarbeite(rohEvents: readonly RohEvent[]): ImportErgebnis {
       const abgeleitet = leiteModulAb(roh.kategorie);
       modulId = abgeleitet.id;
       if (!module.has(modulId)) {
-        module.set(modulId, { ...abgeleitet, quelle: 'moodle', ausgeblendet: false });
+        module.set(modulId, {
+          ...abgeleitet,
+          quelle: 'moodle',
+          ausgeblendet: false,
+          ausgeblendeteKategorien: KEINE_KATEGORIE_AUSGEBLENDET,
+        });
       }
     }
 

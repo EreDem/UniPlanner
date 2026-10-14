@@ -4,6 +4,7 @@ import {
   anzeigeTitel,
   baueToDoListe,
   istVorlesung,
+  KEINE_KATEGORIE_AUSGEBLENDET,
   STANDARD_EINSTELLUNGEN,
   stapleNachModul,
   type RohEvent,
@@ -18,18 +19,13 @@ describe('verarbeite mit der Beispiel-Fixture', () => {
   const abgaben = ergebnis.events.filter((e) => e.typ === 'abgabe');
   const uid = (nummer: number) => `${nummer}@moodle.example.org`;
 
-  it('leitet drei Module ab', () => {
+  it('leitet drei Module ab, alles eingeblendet', () => {
+    const sichtbar = { quelle: 'moodle', ausgeblendet: false, ausgeblendeteKategorien: KEINE_KATEGORIE_AUSGEBLENDET };
     expect(ergebnis.module).toEqual(
       expect.arrayContaining([
-        { id: 'analysis', name: 'Analysis', art: 'VO', quelle: 'moodle', ausgeblendet: false },
-        { id: 'datenbanken', name: 'Datenbanken', art: 'VU', quelle: 'moodle', ausgeblendet: false },
-        {
-          id: 'spieleprogrammierung',
-          name: 'Spieleprogrammierung',
-          art: 'PR',
-          quelle: 'moodle',
-          ausgeblendet: false,
-        },
+        { id: 'analysis', name: 'Analysis', art: 'VO', ...sichtbar },
+        { id: 'datenbanken', name: 'Datenbanken', art: 'VU', ...sichtbar },
+        { id: 'spieleprogrammierung', name: 'Spieleprogrammierung', art: 'PR', ...sichtbar },
       ]),
     );
     expect(ergebnis.module).toHaveLength(3);

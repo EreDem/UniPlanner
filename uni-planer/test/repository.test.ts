@@ -15,6 +15,7 @@ import {
   loescheManuellesEvent,
   setzeAbrufErfolg,
   setzeEventAusgeblendet,
+  setzeKategorieAusgeblendet,
   setzeModulAusgeblendet,
   setzeStatus,
   speichereEinstellungen,
@@ -22,10 +23,11 @@ import {
 } from '@/db/repository';
 import { parseIcs } from '@/import/parse';
 import { verarbeite } from '@/import/verarbeite';
-import type { RohEvent } from '@/model/types';
+import { KEINE_KATEGORIE_AUSGEBLENDET, type RohEvent } from '@/model/types';
 import { berlinZuUtc } from '@/zeit';
 
 import beispielIcs from './fixtures/beispiel.ics';
+import schemaV1 from './fixtures/schema-v1.sql';
 import { erzeugeTestDb, nodeSqliteVerfuegbar } from './hilfen/testDb';
 
 // Di 13.10.2026, 12:00 Berliner Zeit.
@@ -55,20 +57,42 @@ async function importiere(db: Db, roh: RohEvent[] = ROH, jetzt = JETZT) {
   });
 
   it('aktualisiert eine Datenbank von Version 1 auf denselben Stand wie eine neue', async () => {
-    const spalten = (d: Db) => d.getAllAsync("SELECT name, type, \"notnull\" FROM pragma_table_info('event')");
+    const spalten = async (d: Db) =>
+      Promise.all(
+        ['modul', 'event', 'event_uid', 'status', 'einstellung'].map((tabelle) =>
+          d.getAllAsync(`SELECT '${tabelle}' AS tabelle, name, type, "notnull", dflt_value FROM pragma_table_info('${tabelle}')`),
+        ),
+      );
 
-    // Stand von Version 1 nachbauen: ohne Spalte `kuerzel`, mit einem vorhandenen Event.
+    // Ein Gerät mit Version 1 und vorhandenen Daten.
     const alt = erzeugeTestDb();
-    await migriere(alt);
-    await alt.execAsync('ALTER TABLE event DROP COLUMN kuerzel; PRAGMA user_version = 1;');
-    await alt.execAsync(
-      "INSERT INTO event (id, typ, quelle, titel, start_ms, ende_ms) VALUES ('alt', 'vorlesung', 'moodle', 'Analysis', 0, 1)",
-    );
+    await alt.execAsync(schemaV1);
+    await alt.execAsync('PRAGMA user_version = 1');
+    await alt.execAsync(`
+      INSERT INTO modul (id, name, quelle, ausgeblendet) VALUES ('analysis', 'Analysis', 'moodle', 1);
+      INSERT INTO event (id, typ, quelle, modul_id, titel, start_ms, ende_ms)
+        VALUES ('alt', 'vorlesung', 'moodle', 'analysis', 'Analysis', 0, 1);
+    `);
 
     await migriere(alt);
     expect(await alt.getFirstAsync('PRAGMA user_version')).toEqual({ user_version: SCHEMA_VERSION });
     expect(await spalten(alt)).toEqual(await spalten(db));
     expect(await ladeEvent(alt, 'alt')).toMatchObject({ titel: 'Analysis', kuerzel: null });
+    expect(await ladeModule(alt)).toEqual([
+      expect.objectContaining({ id: 'analysis', ausgeblendet: true, ausgeblendeteKategorien: KEINE_KATEGORIE_AUSGEBLENDET }),
+    ]);
+  });
+
+  it('blendet Kategorien eines Moduls einzeln aus, ohne dass der Import das ändert', async () => {
+    await importiere(db);
+    await setzeKategorieAusgeblendet(db, 'analysis', 'uebungen', true);
+    await setzeKategorieAusgeblendet(db, 'analysis', 'abgaben', true);
+    await setzeKategorieAusgeblendet(db, 'analysis', 'abgaben', false);
+    await importiere(db);
+
+    const analysis = (await ladeModule(db)).find((m) => m.id === 'analysis')!;
+    expect(analysis.ausgeblendet).toBe(false);
+    expect(analysis.ausgeblendeteKategorien).toEqual({ vorlesungen: false, uebungen: true, abgaben: false });
   });
 
   it('speichert das Kürzel und aktualisiert es beim Import', async () => {

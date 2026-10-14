@@ -5,19 +5,12 @@ import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Abschnittstitel, Fliesstext, Hinweis, Karte, Knopf, OptionZeile } from '@/components/bausteine';
-import { modulFarbe } from '@/constants/farben';
+import { ModulEinstellung } from '@/components/modul-einstellung';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { meldeAenderung, useDatenVersion } from '@/daten/aenderungen';
 import { useVerbindung } from '@/daten/verbindung';
 import type { Db } from '@/db/db';
-import {
-  ladeAbrufInfo,
-  ladeEinstellungen,
-  ladeModule,
-  loescheAlleDaten,
-  setzeModulAusgeblendet,
-  speichereEinstellungen,
-} from '@/db/repository';
+import { ladeAbrufInfo, ladeEinstellungen, ladeModule, loescheAlleDaten, speichereEinstellungen } from '@/db/repository';
 import { useJetzt } from '@/hooks/use-jetzt';
 import { useTheme } from '@/hooks/use-theme';
 import { importiere } from '@/import/importiere';
@@ -153,22 +146,11 @@ export default function EinstellungenScreen() {
         <Abschnittstitel>Module</Abschnittstitel>
         <Karte>
           {module.length === 0 && <Fliesstext sekundaer>Noch keine Module.</Fliesstext>}
+          {module.length > 0 && (
+            <Fliesstext sekundaer>Antippen, um Vorlesungen, Übungen oder Abgaben einzeln auszublenden.</Fliesstext>
+          )}
           {module.map((modul) => (
-            <View key={modul.id} style={styles.schalterZeile}>
-              <View style={[styles.punkt, { backgroundColor: modulFarbe(modul.id) }]} />
-              <Text style={[styles.schalterText, { color: theme.text }]}>
-                {modul.name}
-                {modul.art ? <Text style={{ color: theme.textSecondary }}> ({modul.art})</Text> : null}
-              </Text>
-              <Switch
-                accessibilityLabel={`${modul.name} anzeigen`}
-                value={!modul.ausgeblendet}
-                onValueChange={async (anzeigen) => {
-                  await setzeModulAusgeblendet(db, modul.id, !anzeigen);
-                  meldeAenderung();
-                }}
-              />
-            </View>
+            <ModulEinstellung key={modul.id} modul={modul} />
           ))}
         </Karte>
 
@@ -200,5 +182,4 @@ const styles = StyleSheet.create({
   engeKarte: { paddingVertical: Spacing.one, paddingHorizontal: Spacing.two, gap: 0 },
   schalterZeile: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, minHeight: 44 },
   schalterText: { flex: 1, fontSize: 15 },
-  punkt: { width: 10, height: 10, borderRadius: 5 },
 });

@@ -6,6 +6,8 @@ import {
   effektiverStatus,
   istErledigt,
   istVorlesung,
+  kategorieVon,
+  KEINE_KATEGORIE_AUSGEBLENDET,
   stapleNachModul,
   STANDARD_EINSTELLUNGEN,
   type Modul,
@@ -41,10 +43,17 @@ const vorlesung = (id: string, tag: number, stunde: number) =>
 const abgabe = (id: string, tag: number, stunde = 23, minute = 59) =>
   event({ id, typ: 'abgabe', startMs: zeit(tag, stunde, minute), endeMs: zeit(tag, stunde, minute) });
 
-const MODULE: Modul[] = [
-  { id: 'datenbanken', name: 'Datenbanken', art: 'VU', quelle: 'moodle', ausgeblendet: false },
-  { id: 'analysis', name: 'Analysis', art: 'VO', quelle: 'moodle', ausgeblendet: true },
-];
+const modul = (id: string, name: string, teil: Partial<Modul> = {}): Modul => ({
+  id,
+  name,
+  art: null,
+  quelle: 'moodle',
+  ausgeblendet: false,
+  ausgeblendeteKategorien: KEINE_KATEGORIE_AUSGEBLENDET,
+  ...teil,
+});
+
+const MODULE: Modul[] = [modul('datenbanken', 'Datenbanken', { art: 'VU' }), modul('analysis', 'Analysis', { ausgeblendet: true })];
 
 function liste(events: UniEvent[], teil: Partial<ToDoEingabe> = {}) {
   return baueToDoListe({
@@ -158,6 +167,48 @@ describe('baueToDoListe', () => {
 
   it('zeigt vergangene Vorlesungen von heute nur unter Heute', () => {
     expect(ids(liste([vorlesung('vormittag', 20, 8)]))).toEqual({ heute: ['vormittag'] });
+  });
+
+  it('blendet einzelne Kategorien eines Moduls aus', () => {
+    const events = [
+      vorlesung('vl-heute', 20, 8),
+      event({ ...vorlesung('tut-heute', 20, 14), titel: 'Tutorium' }),
+      vorlesung('vl-gestern', 19, 10),
+      abgabe('frist', 22),
+      event({ ...abgabe('frist-ohne-modul', 22), modulId: null }),
+    ];
+    const mitAusgeblendet = (kategorien: Partial<Modul['ausgeblendeteKategorien']>) =>
+      ids(
+        liste(events, {
+          module: [
+            modul('datenbanken', 'Datenbanken', {
+              ausgeblendeteKategorien: { ...KEINE_KATEGORIE_AUSGEBLENDET, ...kategorien },
+            }),
+          ],
+        }),
+      );
+
+    expect(mitAusgeblendet({ uebungen: true })).toEqual({
+      heute: ['vl-heute'],
+      abgaben: ['frist', 'frist-ohne-modul'],
+      nachzuarbeiten: ['vl-gestern'],
+    });
+    expect(mitAusgeblendet({ vorlesungen: true })).toEqual({
+      heute: ['tut-heute'],
+      abgaben: ['frist', 'frist-ohne-modul'],
+    });
+    expect(mitAusgeblendet({ abgaben: true })).toEqual({
+      heute: ['vl-heute', 'tut-heute'],
+      abgaben: ['frist-ohne-modul'],
+      nachzuarbeiten: ['vl-gestern'],
+    });
+  });
+
+  it('blendet beim ganzen Modul alles aus, unabhängig von den Kategorien', () => {
+    const bereiche = liste([vorlesung('vl', 20, 8), abgabe('frist', 22)], {
+      module: [modul('datenbanken', 'Datenbanken', { ausgeblendet: true })],
+    });
+    expect(bereiche).toEqual([]);
   });
 
   it('blendet Moodle-Events vor dem Startdatum aus, manuelle nicht', () => {
@@ -367,8 +418,14 @@ describe('Vorlesungen und andere Veranstaltungen', () => {
   it('lässt manuelle Vorlesungen Vorlesungen sein und Abgaben Abgaben', () => {
     expect(istVorlesung(termin('Tutorium', { quelle: 'manuell' }))).toBe(true);
     expect(istVorlesung(abgabe('Übungsblatt 2 ist fällig', 22))).toBe(false);
-    expect(artText(termin('Tutorium'))).toBe('Veranstaltung');
+    expect(artText(termin('Tutorium'))).toBe('Übung');
     expect(artText(termin('Vorlesung'))).toBe('Vorlesung');
+  });
+
+  it('ordnet jedes Event einer Kategorie zu', () => {
+    expect(kategorieVon(termin('Vorlesung'))).toBe('vorlesungen');
+    expect(kategorieVon(termin('Analysis', { kuerzel: 'TU' }))).toBe('uebungen');
+    expect(kategorieVon(abgabe('frist', 22))).toBe('abgaben');
   });
 
   it('zeigt andere Veranstaltungen nur unter „Heute“', () => {
