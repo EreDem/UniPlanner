@@ -1,6 +1,6 @@
 # Datenmodell
 
-Quelle der Wahrheit für das Schema ist [`src/db/schema.sql`](../src/db/schema.sql) (aktueller Stand, Version 3; bestehende Installationen werden über [`src/db/migrationen/`](../src/db/migrationen/) aktualisiert), für Typen und Kernregeln [`src/model/types.ts`](../src/model/types.ts).
+Quelle der Wahrheit für das Schema ist [`src/db/schema.sql`](../src/db/schema.sql) (aktueller Stand, Version 4; bestehende Installationen werden über [`src/db/migrationen/`](../src/db/migrationen/) aktualisiert), für Typen und Kernregeln [`src/model/types.ts`](../src/model/types.ts).
 
 ## Tabellen
 
@@ -9,6 +9,7 @@ erDiagram
     modul ||--o{ event : "gehört zu"
     event ||--o{ event_uid : "hat UIDs"
     event ||--o| status : "hat Status"
+    event ||--o| nutzerdaten : "hat Notiz, Punkte"
 
     modul {
         TEXT id PK "Slug, z. B. datenbanken"
@@ -45,13 +46,21 @@ erDiagram
         TEXT status
         INTEGER geaendert_ms
     }
+    nutzerdaten {
+        TEXT event_id PK, FK
+        TEXT notiz "höchstens 50 Zeichen"
+        REAL punkte_erreicht "nur Abgaben"
+        REAL punkte_max "nur Abgaben, größer 0"
+        INTEGER geaendert_ms
+    }
     einstellung {
         TEXT schluessel PK
         TEXT wert
     }
 ```
 
-- Der Nutzerstatus liegt in `status`, ein Import fasst diese Tabelle nie an.
+- Der Nutzerstatus liegt in `status`, Notiz und Punkte in `nutzerdaten`. Ein Import fasst beide Tabellen nie an.
+- Punkte sind Zahlen, damit sie sich später auswerten lassen (z. B. Summe oder Anteil pro Modul).
 - Fehlt eine Zeile in `status`, gilt der Standard: Vorlesung → Einstellung (Default `nachzuarbeiten`), Abgabe → `ausstehend`.
 - `ausgeblendet` setzt der Import für Öffnungs-Marker. Hat der Nutzer selbst ein- oder ausgeblendet (`ausgeblendet_vom_nutzer = 1`), überschreibt der Import das nicht mehr.
 - `einstellung` enthält `vorlesung_standard`, `nur_abgaben`, `startdatum_ms` (Montag der Einrichtungswoche; Moodle-Events davor werden nicht angezeigt), `letzter_abruf_ms`, `letzter_abruf_fehler` und `beispieldaten`.

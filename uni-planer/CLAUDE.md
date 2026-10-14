@@ -34,6 +34,7 @@ Open Source unter AGPL-3.0. Kommunikation, Doku und Bezeichner im Code sind auf 
 ```
 src/app/                Screens (Expo Router): Onboarding, (tabs)/To-do + Erledigt + Einstellungen, event/[id], neues-event
 src/model/types.ts      Typen und Kernregeln (rein, ohne Expo)
+src/model/angaben.ts    Notiz und Punkte: Grenzen, Eingabe prüfen (rein)
 src/zeit.ts             Formatierung und Tagesgrenzen in Europe/Berlin (rein)
 src/import/             abruf.ts, parse.ts, verarbeite.ts (rein), importiere.ts (Orchestrierung)
 src/db/                 schema.sql (vollständiges aktuelles Schema für neue Installationen), migrationen/ (Upgrades
@@ -66,7 +67,7 @@ Zeitzone: Den Berliner UTC-Offset berechnet `src/zeit.ts` selbst (EU-Sommerzeitr
 - **Vorlesung oder andere Veranstaltung** (abgeleitet, `istVorlesung`), in dieser Reihenfolge: „Vorlesung“/„Lecture“ im Titel → Vorlesung; Übung, Tutorium, Praktikum, Seminar, Labor, Sprechstunde, Klausur, Prüfung u. Ä. im Titel → andere Veranstaltung; Kürzel TU, UE, PR, SE, PS → andere Veranstaltung; sonst (VO, VU, unbekannt, ohne Kürzel) → Vorlesung. Der Titel geht vor, weil VU-Kurse beides enthalten. Manuelle Termine sind immer Vorlesungen.
 - **Öffnungs-Marker ausblenden**: Moodle erzeugt für manche Aktivitäten ein Event beim Öffnen und eins beim Schließen. Titel, die auf „beginnt“, „gestartet“ oder „opens“ enden, werden ausgeblendet; nur das Schließen ist eine Aufgabe.
 - **Deduplizierung**: Gleiches Modul + gleiche Start- und Endzeit = ein Event, auch wenn die UIDs verschieden sind (z. B. Übertragung in zwei Hörsäle). Räume werden gesammelt. Die Zuordnung UID → Event steht in `event_uid`.
-- **Re-Import darf nie den Nutzerstatus überschreiben.** Status liegt deshalb in einer eigenen Tabelle.
+- **Re-Import darf nie den Nutzerstatus überschreiben.** Status liegt deshalb in einer eigenen Tabelle, ebenso Notizen und Punkte (`nutzerdaten`).
 - **Verschwundene Events** werden nicht gelöscht, sondern bekommen `entfernt_ms`.
 - **Startdatum**: Moodle exportiert die letzten und nächsten 60 Tage. Damit die Liste bei Einrichtung mitten im Semester nicht voll ist, gilt als Startdatum der Montag der Woche, in der Moodle verbunden wurde (Einstellung `startdatum_ms`). Moodle-Events davor erscheinen weder in der To-do-Liste noch im Erledigt-Tab; manuelle Events immer. Beispieldaten haben kein Startdatum.
 
@@ -94,6 +95,10 @@ Einstellungen: Vorlesungen standardmäßig `erledigt`, oder nur Abgaben anzeigen
 Module ausblenden (Einstellungen → Module): Der Schalter am Modul blendet das ganze Modul aus. Aufgeklappt (Pfeil) lassen sich die Kategorien einzeln ausblenden: Vorlesungen, Übungen, Abgaben (`kategorieVon`). „Übungen“ heißt in der App alles, was keine Vorlesung ist (Übung, Tutorium, Praktikum …), vorläufiger Name. Ist das ganze Modul aus, bleiben die Kategorie-Schalter erhalten, sind aber ausgegraut. Gilt für To-do-Liste und Erledigt-Tab; ein Import ändert nichts daran.
 
 Anzeige: Moodle-Vorlesungen heißen überall „Vorlesung“ (`anzeigeTitel`), weil ihr Moodle-Titel meist nur der Kursname ist, der schon als Modul darübersteht. Andere Veranstaltungen (z. B. „Tutorium“) und manuelle Events behalten ihren Titel.
+
+## Notiz und Punkte
+
+In der Detailansicht jedes Events gibt es eine Notiz (höchstens 50 Zeichen, Zähler „n / 50“), bei Abgaben zusätzlich Punkte („erreicht / maximal“). Gespeichert wird beim Tippen in der Tabelle `nutzerdaten`. Punkte sind Zahlen (`REAL`, Eingabe mit Komma oder Punkt, höchstens zwei Nachkommastellen), damit sie später ausgewertet werden können (z. B. Zulassungs-Tracking pro Modul). Erreicht darf größer als maximal sein (Bonuspunkte), maximal muss größer als 0 sein; ungültige Eingaben werden nicht gespeichert. Regeln in `src/model/angaben.ts`.
 
 ## Erledigt-Tab
 

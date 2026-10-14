@@ -1,6 +1,7 @@
 // Alle Lese- und Schreibzugriffe auf die Datenbank.
 
 import { slug, type ImportErgebnis } from '@/import/verarbeite';
+import { MAX_NOTIZ_ZEICHEN, type Punkte } from '@/model/angaben';
 import {
   STANDARD_EINSTELLUNGEN,
   type Einstellungen,
@@ -135,6 +136,44 @@ export async function setzeStatus(
     `INSERT INTO status (event_id, status, geaendert_ms) VALUES (?, ?, ?)
      ON CONFLICT (event_id) DO UPDATE SET status = excluded.status, geaendert_ms = excluded.geaendert_ms`,
     [eventId, status, jetztMs],
+  );
+}
+
+// ---------- Eigene Angaben (Notiz, Punkte) ----------
+
+export interface Nutzerdaten extends Punkte {
+  notiz: string | null;
+}
+
+export async function ladeNutzerdaten(db: Db, eventId: string): Promise<Nutzerdaten> {
+  const zeile = await db.getFirstAsync<{ notiz: string | null; punkte_erreicht: number | null; punkte_max: number | null }>(
+    'SELECT notiz, punkte_erreicht, punkte_max FROM nutzerdaten WHERE event_id = ?',
+    [eventId],
+  );
+  return {
+    notiz: zeile?.notiz ?? null,
+    erreicht: zeile?.punkte_erreicht ?? null,
+    max: zeile?.punkte_max ?? null,
+  };
+}
+
+/** Speichert die Notiz (leer → `null`). Längere Texte als erlaubt werden gekürzt. */
+export async function speichereNotiz(db: Db, eventId: string, notiz: string, jetztMs = Date.now()): Promise<void> {
+  const wert = notiz === '' ? null : notiz.slice(0, MAX_NOTIZ_ZEICHEN);
+  await db.runAsync(
+    `INSERT INTO nutzerdaten (event_id, notiz, geaendert_ms) VALUES (?, ?, ?)
+     ON CONFLICT (event_id) DO UPDATE SET notiz = excluded.notiz, geaendert_ms = excluded.geaendert_ms`,
+    [eventId, wert, jetztMs],
+  );
+}
+
+/** Speichert erreichte und maximale Punkte (vorher mit `pruefePunkte` prüfen). */
+export async function speicherePunkte(db: Db, eventId: string, punkte: Punkte, jetztMs = Date.now()): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO nutzerdaten (event_id, punkte_erreicht, punkte_max, geaendert_ms) VALUES (?, ?, ?, ?)
+     ON CONFLICT (event_id) DO UPDATE SET punkte_erreicht = excluded.punkte_erreicht,
+       punkte_max = excluded.punkte_max, geaendert_ms = excluded.geaendert_ms`,
+    [eventId, punkte.erreicht, punkte.max, jetztMs],
   );
 }
 
@@ -375,18 +414,19 @@ function freieId(wunsch: string, vergeben: ReadonlySet<string>): string {
 
 // ---------- Löschen ----------
 
-/** Löscht Events, Module und Status, behält aber die Einstellungen. */
+const KALENDERDATEN_LOESCHEN =
+  'DELETE FROM status; DELETE FROM nutzerdaten; DELETE FROM event_uid; DELETE FROM event; DELETE FROM modul;';
+
+/** Löscht Events, Module, Status, Notizen und Punkte, behält aber die Einstellungen. */
 export async function loescheKalenderdaten(db: Db): Promise<void> {
   await inTransaktion(db, async () => {
-    await db.execAsync('DELETE FROM status; DELETE FROM event_uid; DELETE FROM event; DELETE FROM modul;');
+    await db.execAsync(KALENDERDATEN_LOESCHEN);
   });
 }
 
 /** Löscht den gesamten Datenbankinhalt (der Moodle-Link liegt separat im Secure Store). */
 export async function loescheAlleDaten(db: Db): Promise<void> {
   await inTransaktion(db, async () => {
-    await db.execAsync(
-      'DELETE FROM status; DELETE FROM event_uid; DELETE FROM event; DELETE FROM modul; DELETE FROM einstellung;',
-    );
+    await db.execAsync(`${KALENDERDATEN_LOESCHEN} DELETE FROM einstellung;`);
   });
 }

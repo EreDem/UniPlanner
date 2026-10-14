@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Abschnittstitel, Fliesstext, Hinweis, Karte, Knopf, OptionZeile } from '@/components/bausteine';
+import { NotizFeld, PunkteFeld } from '@/components/event-angaben';
 import { modulFarbe } from '@/constants/farben';
 import { Spacing } from '@/constants/theme';
 import { meldeAenderung, useDatenVersion } from '@/daten/aenderungen';
@@ -12,6 +13,7 @@ import {
   ladeEinstellungen,
   ladeEvent,
   ladeModule,
+  ladeNutzerdaten,
   ladeStatus,
   loescheManuellesEvent,
   setzeEventAusgeblendet,
@@ -31,17 +33,19 @@ import {
 import { formatiere, fristText, terminText } from '@/zeit';
 
 async function ladeDaten(db: Db, id: string) {
-  const [event, module, status, einstellungen] = await Promise.all([
+  const [event, module, status, einstellungen, nutzerdaten] = await Promise.all([
     ladeEvent(db, id),
     ladeModule(db),
     ladeStatus(db),
     ladeEinstellungen(db),
+    ladeNutzerdaten(db, id),
   ]);
   if (!event) return { event: null } as const;
   return {
     event,
     modul: module.find((modul) => modul.id === event.modulId) ?? null,
     status: effektiverStatus(event.typ, status.get(event.id), einstellungen),
+    nutzerdaten,
   };
 }
 
@@ -71,7 +75,7 @@ export default function EventDetail() {
       </View>
     );
   }
-  const { event, modul, status } = daten;
+  const { event, modul, status, nutzerdaten } = daten;
 
   async function waehle(neu: Status) {
     await setzeStatus(db, event.id, neu);
@@ -110,7 +114,11 @@ export default function EventDetail() {
       : terminText(event.startMs, event.endeMs);
 
   return (
-    <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.inhalt}>
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+      style={{ backgroundColor: theme.background }}
+      contentContainerStyle={styles.inhalt}>
       <View style={styles.modulZeile}>
         <View style={[styles.punkt, { backgroundColor: modulFarbe(event.modulId) }]} />
         <Text style={[styles.modul, { color: theme.textSecondary }]}>
@@ -134,15 +142,6 @@ export default function EventDetail() {
       )}
       {event.ausgeblendet && <Hinweis>Ausgeblendet – erscheint nicht in der To-do-Liste.</Hinweis>}
 
-      {event.beschreibung && (
-        <>
-          <Abschnittstitel>Beschreibung</Abschnittstitel>
-          <Text selectable style={[styles.beschreibung, { color: theme.text }]}>
-            {event.beschreibung}
-          </Text>
-        </>
-      )}
-
       {hatStatus && (
         <>
           <Abschnittstitel>Status</Abschnittstitel>
@@ -156,6 +155,25 @@ export default function EventDetail() {
               />
             ))}
           </Karte>
+        </>
+      )}
+
+      {event.typ === 'abgabe' && (
+        <>
+          <Abschnittstitel>Punkte</Abschnittstitel>
+          <PunkteFeld key={event.id} eventId={event.id} anfangswert={nutzerdaten} />
+        </>
+      )}
+
+      <Abschnittstitel>Notiz</Abschnittstitel>
+      <NotizFeld key={event.id} eventId={event.id} anfangswert={nutzerdaten.notiz} />
+
+      {event.beschreibung && (
+        <>
+          <Abschnittstitel>Beschreibung</Abschnittstitel>
+          <Text selectable style={[styles.beschreibung, { color: theme.text }]}>
+            {event.beschreibung}
+          </Text>
         </>
       )}
 

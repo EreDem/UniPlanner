@@ -1,5 +1,5 @@
 
--- SQLite-Schema des Uni-Planers (expo-sqlite), aktueller Stand = Version 3.
+-- SQLite-Schema des Uni-Planers (expo-sqlite), aktueller Stand = Version 4.
 -- Neue Installationen führen diese Datei aus; bestehende werden über src/db/migrationen/ aktualisiert
 -- (siehe src/db/db.ts, PRAGMA user_version). Änderungen hier immer auch als Migration anlegen.
 -- Zeitpunkte sind UTC-Millisekunden, Spalten enden auf _ms. Wahrheitswerte sind 0/1.
@@ -56,6 +56,16 @@ CREATE TABLE status (
                  'nachzuarbeiten', 'erledigt', 'ausstehend', 'angefangen', 'abgegeben'
                )),
   geaendert_ms INTEGER NOT NULL
+);
+
+-- Eigene Angaben des Nutzers pro Event, getrennt vom Event. Ein Import fasst diese Tabelle nie an.
+-- Punkte als Zahl, damit sie später ausgewertet werden können (seit Version 4).
+CREATE TABLE nutzerdaten (
+  event_id        TEXT    PRIMARY KEY REFERENCES event (id) ON DELETE CASCADE,
+  notiz           TEXT    CHECK (notiz IS NULL OR length(notiz) <= 50),
+  punkte_erreicht REAL    CHECK (punkte_erreicht IS NULL OR punkte_erreicht >= 0),
+  punkte_max      REAL    CHECK (punkte_max IS NULL OR punkte_max > 0),
+  geaendert_ms    INTEGER NOT NULL
 );
 
 -- Einstellungen und Abrufzustand als Schlüssel-Wert-Paare:

@@ -8,6 +8,7 @@ import {
   ladeEvent,
   ladeEvents,
   ladeModule,
+  ladeNutzerdaten,
   ladeStatus,
   legeManuellesEventAn,
   legeModulAn,
@@ -20,6 +21,8 @@ import {
   setzeStatus,
   speichereEinstellungen,
   speichereImport,
+  speichereNotiz,
+  speicherePunkte,
 } from '@/db/repository';
 import { parseIcs } from '@/import/parse';
 import { verarbeite } from '@/import/verarbeite';
@@ -59,7 +62,7 @@ async function importiere(db: Db, roh: RohEvent[] = ROH, jetzt = JETZT) {
   it('aktualisiert eine Datenbank von Version 1 auf denselben Stand wie eine neue', async () => {
     const spalten = async (d: Db) =>
       Promise.all(
-        ['modul', 'event', 'event_uid', 'status', 'einstellung'].map((tabelle) =>
+        ['modul', 'event', 'event_uid', 'status', 'nutzerdaten', 'einstellung'].map((tabelle) =>
           d.getAllAsync(`SELECT '${tabelle}' AS tabelle, name, type, "notnull", dflt_value FROM pragma_table_info('${tabelle}')`),
         ),
       );
@@ -81,6 +84,56 @@ async function importiere(db: Db, roh: RohEvent[] = ROH, jetzt = JETZT) {
     expect(await ladeModule(alt)).toEqual([
       expect.objectContaining({ id: 'analysis', ausgeblendet: true, ausgeblendeteKategorien: KEINE_KATEGORIE_AUSGEBLENDET }),
     ]);
+  });
+
+  it('speichert Notiz und Punkte und behält sie bei erneutem Import', async () => {
+    await importiere(db);
+    await speichereNotiz(db, uid(2008), 'Aufgabe 3 mit Lisa');
+    await speicherePunkte(db, uid(2008), { erreicht: 7.5, max: 10 });
+    await speichereNotiz(db, uid(2001), 'Folien 12–20');
+    await importiere(db);
+
+    expect(await ladeNutzerdaten(db, uid(2008))).toEqual({ notiz: 'Aufgabe 3 mit Lisa', erreicht: 7.5, max: 10 });
+    expect(await ladeNutzerdaten(db, uid(2001))).toEqual({ notiz: 'Folien 12–20', erreicht: null, max: null });
+    expect(await ladeNutzerdaten(db, uid(2010))).toEqual({ notiz: null, erreicht: null, max: null });
+  });
+
+  it('ändert Notiz und Punkte unabhängig voneinander', async () => {
+    await importiere(db);
+    await speicherePunkte(db, uid(2008), { erreicht: 4, max: 10 });
+    await speichereNotiz(db, uid(2008), 'neu');
+    await speichereNotiz(db, uid(2008), '');
+    await speicherePunkte(db, uid(2008), { erreicht: null, max: 10 });
+
+    expect(await ladeNutzerdaten(db, uid(2008))).toEqual({ notiz: null, erreicht: null, max: 10 });
+  });
+
+  it('begrenzt die Notiz auf 50 Zeichen', async () => {
+    await importiere(db);
+    await speichereNotiz(db, uid(2008), 'x'.repeat(60));
+    expect((await ladeNutzerdaten(db, uid(2008))).notiz).toHaveLength(50);
+    await expect(
+      db.runAsync("UPDATE nutzerdaten SET notiz = ? WHERE event_id = ?", ['y'.repeat(51), uid(2008)]),
+    ).rejects.toThrow();
+  });
+
+  it('löscht Notiz und Punkte mit dem manuellen Event und mit allen Daten', async () => {
+    const id = await legeManuellesEventAn(db, {
+      typ: 'abgabe',
+      modulId: null,
+      titel: 'Probeklausur',
+      startMs: JETZT,
+      endeMs: JETZT,
+      raum: null,
+    });
+    await speichereNotiz(db, id, 'mitnehmen');
+    await loescheManuellesEvent(db, id);
+    expect(await anzahl(db, 'nutzerdaten')).toBe(0);
+
+    await importiere(db);
+    await speicherePunkte(db, uid(2008), { erreicht: 1, max: 2 });
+    await loescheAlleDaten(db);
+    expect(await anzahl(db, 'nutzerdaten')).toBe(0);
   });
 
   it('blendet Kategorien eines Moduls einzeln aus, ohne dass der Import das ändert', async () => {
