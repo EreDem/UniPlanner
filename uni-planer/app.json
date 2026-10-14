@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "uni-planer",
+    "name": "Uni-Planer",
     "slug": "uni-planer",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,6 +11,7 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "de.uniplaner.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -39,6 +40,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a2f2275b-4cd2-430a-9953-12f273fec54e"
+      }
     }
   }
 }

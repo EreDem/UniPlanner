@@ -1,0 +1,248 @@
+/**
+ * @jest-environment node
+ */
+import { migriere, SCHEMA_VERSION, type Db } from '@/db/db';
+import {
+  ladeAbrufInfo,
+  ladeEinstellungen,
+  ladeEvent,
+  ladeEvents,
+  ladeModule,
+  ladeStatus,
+  legeManuellesEventAn,
+  legeModulAn,
+  loescheAlleDaten,
+  loescheManuellesEvent,
+  setzeAbrufErfolg,
+  setzeEventAusgeblendet,
+  setzeModulAusgeblendet,
+  setzeStatus,
+  speichereEinstellungen,
+  speichereImport,
+} from '@/db/repository';
+import { parseIcs } from '@/import/parse';
+import { verarbeite } from '@/import/verarbeite';
+import type { RohEvent } from '@/model/types';
+import { berlinZuUtc } from '@/zeit';
+
+import beispielIcs from './fixtures/beispiel.ics';
+import { erzeugeTestDb, nodeSqliteVerfuegbar } from './hilfen/testDb';
+
+// Di 13.10.2026, 12:00 Berliner Zeit.
+const JETZT = berlinZuUtc(2026, 10, 13, 12, 0);
+const uid = (nummer: number) => `${nummer}@moodle.example.org`;
+const ROH = parseIcs(beispielIcs);
+
+async function anzahl(db: Db, tabelle: string): Promise<number> {
+  return (await db.getFirstAsync<{ n: number }>(`SELECT COUNT(*) AS n FROM ${tabelle}`))!.n;
+}
+
+async function importiere(db: Db, roh: RohEvent[] = ROH, jetzt = JETZT) {
+  await speichereImport(db, verarbeite(roh), jetzt);
+}
+
+(nodeSqliteVerfuegbar ? describe : describe.skip)('Repository', () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = erzeugeTestDb();
+    await migriere(db);
+  });
+
+  it('legt das Schema an und migriert nur einmal', async () => {
+    await migriere(db);
+    expect(await db.getFirstAsync('PRAGMA user_version')).toEqual({ user_version: SCHEMA_VERSION });
+  });
+
+  it('aktualisiert eine Datenbank von Version 1 auf denselben Stand wie eine neue', async () => {
+    const spalten = (d: Db) => d.getAllAsync("SELECT name, type, \"notnull\" FROM pragma_table_info('event')");
+
+    // Stand von Version 1 nachbauen: ohne Spalte `kuerzel`, mit einem vorhandenen Event.
+    const alt = erzeugeTestDb();
+    await migriere(alt);
+    await alt.execAsync('ALTER TABLE event DROP COLUMN kuerzel; PRAGMA user_version = 1;');
+    await alt.execAsync(
+      "INSERT INTO event (id, typ, quelle, titel, start_ms, ende_ms) VALUES ('alt', 'vorlesung', 'moodle', 'Analysis', 0, 1)",
+    );
+
+    await migriere(alt);
+    expect(await alt.getFirstAsync('PRAGMA user_version')).toEqual({ user_version: SCHEMA_VERSION });
+    expect(await spalten(alt)).toEqual(await spalten(db));
+    expect(await ladeEvent(alt, 'alt')).toMatchObject({ titel: 'Analysis', kuerzel: null });
+  });
+
+  it('speichert das Kürzel und aktualisiert es beim Import', async () => {
+    await importiere(db);
+    expect((await ladeEvent(db, uid(2018)))!.kuerzel).toBe('TU');
+
+    await importiere(db, ROH.map((r) => (r.uid === uid(2018) ? { ...r, kategorie: '(UE) Analysis' } : r)));
+    expect((await ladeEvent(db, uid(2018)))!.kuerzel).toBe('UE');
+  });
+
+  it('speichert die Beispieldaten', async () => {
+    await importiere(db);
+    expect(await anzahl(db, 'modul')).toBe(3);
+    expect(await anzahl(db, 'event')).toBe(16);
+    expect(await anzahl(db, 'event_uid')).toBe(18);
+
+    const analysis = await ladeEvent(db, uid(2001));
+    expect(analysis).toMatchObject({
+      typ: 'vorlesung',
+      quelle: 'moodle',
+      modulId: 'analysis',
+      raeume: ['[1420|001] Hörsaal A', '[1420|002] Hörsaal B'],
+      ausgeblendet: false,
+      entferntMs: null,
+    });
+    expect((await ladeEvent(db, uid(2009)))!.ausgeblendet).toBe(true);
+  });
+
+  it('erhält den Status bei erneutem Import, auch wenn sich das Event ändert', async () => {
+    await importiere(db);
+    await setzeStatus(db, uid(2008), 'angefangen', JETZT);
+    await setzeStatus(db, uid(2001), 'erledigt', JETZT);
+
+    const geaendert = ROH.map((r) => (r.uid === uid(2008) ? { ...r, titel: 'Übungsblatt 1 (neu) ist fällig' } : r));
+    await importiere(db, geaendert);
+    await importiere(db, geaendert);
+
+    expect(await ladeStatus(db)).toEqual(
+      new Map([
+        [uid(2008), 'angefangen'],
+        [uid(2001), 'erledigt'],
+      ]),
+    );
+    expect((await ladeEvent(db, uid(2008)))!.titel).toBe('Übungsblatt 1 (neu) ist fällig');
+    expect(await anzahl(db, 'event')).toBe(16);
+  });
+
+  it('stellt mit null den Standardstatus wieder her (Rückgängig)', async () => {
+    await importiere(db);
+    await setzeStatus(db, uid(2008), 'abgegeben', JETZT);
+    await setzeStatus(db, uid(2008), null);
+    expect((await ladeStatus(db)).has(uid(2008))).toBe(false);
+  });
+
+  it('findet ein Event über irgendeine seiner UIDs wieder', async () => {
+    await importiere(db);
+    await setzeStatus(db, uid(2001), 'erledigt', JETZT);
+
+    // Die erste UID fehlt im nächsten Export, die Übertragung (2002) ist noch da.
+    await importiere(db, ROH.filter((r) => r.uid !== uid(2001)));
+
+    expect(await anzahl(db, 'event')).toBe(16);
+    expect((await ladeEvent(db, uid(2001)))!.raeume).toEqual(['[1420|002] Hörsaal B']);
+    expect((await ladeStatus(db)).get(uid(2001))).toBe('erledigt');
+  });
+
+  it('legt für eine abgespaltene UID ein eigenes Event an', async () => {
+    await importiere(db);
+    await setzeStatus(db, uid(2001), 'erledigt', JETZT);
+
+    const verschoben = ROH.map((r) => (r.uid === uid(2002) ? { ...r, startMs: r.startMs + 3_600_000, endeMs: r.endeMs + 3_600_000 } : r));
+    await importiere(db, verschoben);
+
+    expect(await anzahl(db, 'event')).toBe(17);
+    expect((await ladeEvent(db, uid(2001)))!.raeume).toEqual(['[1420|001] Hörsaal A']);
+    expect((await ladeEvent(db, uid(2002)))!.raeume).toEqual(['[1420|002] Hörsaal B']);
+    expect((await ladeStatus(db)).get(uid(2001))).toBe('erledigt');
+  });
+
+  it('markiert verschwundene Events in der Zukunft, aber nicht vergangene', async () => {
+    await importiere(db);
+    const ohne = ROH.filter((r) => r.uid !== uid(2010) && r.uid !== uid(2009));
+    const spaeter = berlinZuUtc(2026, 10, 14, 12, 0);
+    await importiere(db, ohne, spaeter);
+
+    expect((await ladeEvent(db, uid(2010)))!.entferntMs).toBe(spaeter);
+    // „Gruppenanmeldung beginnt“ lag am 12.10. schon in der Vergangenheit.
+    expect((await ladeEvent(db, uid(2009)))!.entferntMs).toBeNull();
+
+    await importiere(db, ROH, spaeter);
+    expect((await ladeEvent(db, uid(2010)))!.entferntMs).toBeNull();
+  });
+
+  it('überschreibt ausgeblendet nicht, wenn der Nutzer es gesetzt hat', async () => {
+    await importiere(db);
+    await setzeEventAusgeblendet(db, uid(2008), true);
+    await setzeEventAusgeblendet(db, uid(2009), false);
+    await importiere(db);
+
+    expect((await ladeEvent(db, uid(2008)))!.ausgeblendet).toBe(true);
+    expect((await ladeEvent(db, uid(2009)))!.ausgeblendet).toBe(false);
+  });
+
+  it('fasst ausgeblendete Module beim Import nicht an', async () => {
+    await importiere(db);
+    await setzeModulAusgeblendet(db, 'datenbanken', true);
+    await importiere(db);
+
+    const module = await ladeModule(db);
+    expect(module.map((m) => [m.id, m.ausgeblendet])).toEqual([
+      ['analysis', false],
+      ['datenbanken', true],
+      ['spieleprogrammierung', false],
+    ]);
+  });
+
+  it('lässt manuelle Events beim Import unverändert', async () => {
+    await importiere(db);
+    const modulId = await legeModulAn(db, 'Lerngruppe Mathe');
+    const id = await legeManuellesEventAn(db, {
+      typ: 'abgabe',
+      modulId,
+      titel: 'Probeklausur rechnen',
+      startMs: berlinZuUtc(2026, 11, 2, 18, 0),
+      endeMs: berlinZuUtc(2026, 11, 2, 18, 0),
+      raum: null,
+    });
+    await setzeStatus(db, id, 'angefangen', JETZT);
+    await importiere(db);
+
+    expect(id).toMatch(/^manuell:[0-9a-f-]{36}$/);
+    expect(await ladeEvent(db, id)).toMatchObject({ quelle: 'manuell', entferntMs: null, modulId: 'lerngruppe-mathe' });
+    expect((await ladeStatus(db)).get(id)).toBe('angefangen');
+    expect((await ladeModule(db)).find((m) => m.id === 'lerngruppe-mathe')?.quelle).toBe('manuell');
+
+    await loescheManuellesEvent(db, id);
+    expect(await ladeEvent(db, id)).toBeNull();
+    expect((await ladeStatus(db)).has(id)).toBe(false);
+  });
+
+  it('löscht nur manuelle Events', async () => {
+    await importiere(db);
+    await loescheManuellesEvent(db, uid(2008));
+    expect(await ladeEvent(db, uid(2008))).not.toBeNull();
+  });
+
+  it('verwendet beim Anlegen eines bekannten Modulnamens das vorhandene Modul', async () => {
+    await importiere(db);
+    expect(await legeModulAn(db, 'Datenbanken')).toBe('datenbanken');
+    expect((await ladeModule(db)).find((m) => m.id === 'datenbanken')?.quelle).toBe('moodle');
+  });
+
+  it('speichert Einstellungen', async () => {
+    expect(await ladeEinstellungen(db)).toEqual({
+      vorlesungStandard: 'nachzuarbeiten',
+      nurAbgaben: false,
+      startdatumMs: null,
+    });
+    await speichereEinstellungen(db, { vorlesungStandard: 'erledigt', nurAbgaben: true, startdatumMs: JETZT });
+    expect(await ladeEinstellungen(db)).toEqual({ vorlesungStandard: 'erledigt', nurAbgaben: true, startdatumMs: JETZT });
+
+    await speichereEinstellungen(db, { startdatumMs: null });
+    expect((await ladeEinstellungen(db)).startdatumMs).toBeNull();
+  });
+
+  it('löscht alle Daten', async () => {
+    await importiere(db);
+    await setzeStatus(db, uid(2008), 'abgegeben', JETZT);
+    await setzeAbrufErfolg(db, JETZT);
+    await loescheAlleDaten(db);
+
+    expect(await ladeEvents(db)).toEqual([]);
+    expect(await ladeModule(db)).toEqual([]);
+    expect((await ladeStatus(db)).size).toBe(0);
+    expect(await ladeAbrufInfo(db)).toEqual({ letzterAbrufMs: null, letzterFehler: null, beispieldaten: false });
+  });
+});

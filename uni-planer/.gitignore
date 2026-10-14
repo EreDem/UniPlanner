@@ -32,6 +32,9 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
+# Lokale Notizen (kann die Moodle-Kalender-URL mit Token enthalten, nie committen)
+.local
 
 # typescript
 *.tsbuildinfo
