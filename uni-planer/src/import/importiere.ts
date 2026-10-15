@@ -14,7 +14,7 @@ import {
 import { ladeMoodleLink, speichereMoodleLink } from '@/speicher/moodleLink';
 import { wochenbeginn } from '@/zeit';
 
-import { holeKalender, ImportFehler, pruefeUrl } from './abruf';
+import { holeKalender, ImportFehler, mitExportVoreinstellungen, normalisiereMoodleLink } from './abruf';
 import { ladeBeispielIcs } from './beispieldaten';
 import { parseIcs } from './parse';
 import { verarbeite, type ImportErgebnis } from './verarbeite';
@@ -63,7 +63,8 @@ export function importiere(db: Db): Promise<void> {
       } else {
         const url = await ladeMoodleLink();
         if (!url) throw new ImportFehler('Kein Moodle-Link gespeichert.');
-        icsText = await holeKalender(url);
+        // Auch für Links, die vor der Normalisierung gespeichert wurden.
+        icsText = await holeKalender(mitExportVoreinstellungen(url));
         await sichereStartdatum(db);
       }
       await speichere(db, verarbeiteText(icsText));
@@ -87,11 +88,11 @@ export async function importiereFallsVeraltet(db: Db): Promise<void> {
 }
 
 /**
- * Onboarding: Link prüfen, Testabruf, erst bei Erfolg speichern und importieren.
+ * Onboarding: Link prüfen und normalisieren, Testabruf, erst bei Erfolg speichern und importieren.
  * Bei einem Fehler wird nichts gespeichert.
  */
 export async function verbindeMoodle(db: Db, eingabe: string): Promise<void> {
-  const url = pruefeUrl(eingabe);
+  const url = normalisiereMoodleLink(eingabe);
   const ergebnis = verarbeiteText(await holeKalender(url));
 
   await speichereMoodleLink(url);

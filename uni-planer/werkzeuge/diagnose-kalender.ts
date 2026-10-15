@@ -9,6 +9,7 @@
 // Den Kalender-Link liest das Werkzeug aus der Umgebungsvariable MOODLE_URL oder aus der Datei
 // `.local` (gitignored). Der Link enthält einen Zugangstoken und wird nie ausgegeben.
 
+import { normalisiereMoodleLink } from '@/import/abruf';
 import { parseIcs } from '@/import/parse';
 import { verarbeite } from '@/import/verarbeite';
 import { istVorlesung, kategorieVon, type RohEvent } from '@/model/types';
@@ -59,10 +60,11 @@ function ladeText(url: string, umleitungen = 3): Promise<string> {
 
 function ladeLink(): string {
   const umgebung = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
-  if (umgebung.MOODLE_URL) return umgebung.MOODLE_URL.trim();
+  if (umgebung.MOODLE_URL) return normalisiereMoodleLink(umgebung.MOODLE_URL);
   if (fs.existsSync('.local')) {
-    const treffer = /https:\/\/\S+/.exec(fs.readFileSync('.local', 'utf8'));
-    if (treffer) return treffer[0];
+    // Ohne Anführungszeichen o. Ä. am Ende; normalisiereMoodleLink wirft Fehler ohne den Link.
+    const treffer = /https:\/\/[^\s"'„“”<>]+/.exec(fs.readFileSync('.local', 'utf8'));
+    if (treffer) return normalisiereMoodleLink(treffer[0]);
   }
   throw new Error('Kein Kalender-Link gefunden: MOODLE_URL setzen oder in .local eintragen.');
 }

@@ -8,16 +8,60 @@ export class ImportFehler extends Error {
   override name = 'ImportFehler';
 }
 
-/** Prüft die Eingabe und gibt die bereinigte URL zurück. */
-export function pruefeUrl(eingabe: string): string {
-  const url = eingabe.trim();
+/**
+ * Export-Voreinstellungen, die die App braucht: alle Termine (nicht nur Kurstermine) und das größte
+ * Zeitfenster (letzte und kommende Termine). Wer in Moodle beim Export etwas anderes wählt, bekäme
+ * sonst still weniger Termine, und fehlende künftige Termine würden als „entfernt“ markiert.
+ * Der Token hängt nicht an diesen Parametern, der Link bleibt gültig.
+ */
+const EXPORT_VOREINSTELLUNGEN: Readonly<Record<string, string>> = {
+  preset_what: 'all',
+  preset_time: 'recentupcoming',
+};
+
+/** Setzt die Export-Voreinstellungen; alle anderen Parameter (userid, authtoken) bleiben unverändert. */
+export function mitExportVoreinstellungen(url: string): string {
+  // Bewusst ohne die URL-Klasse, deren Umsetzung in React Native unvollständig sein kann.
+  const ohneFragment = url.split('#')[0];
+  const frage = ohneFragment.indexOf('?');
+  const basis = frage === -1 ? ohneFragment : ohneFragment.slice(0, frage);
+  const parameter = (frage === -1 ? '' : ohneFragment.slice(frage + 1))
+    .split('&')
+    .filter((teil) => teil && !(teil.split('=')[0] in EXPORT_VOREINSTELLUNGEN));
+  const voreinstellungen = Object.entries(EXPORT_VOREINSTELLUNGEN).map(([name, wert]) => `${name}=${wert}`);
+  return `${basis}?${[...parameter, ...voreinstellungen].join('&')}`;
+}
+
+/**
+ * Prüft den eingegebenen Link und bringt ihn in die Form, die die App braucht:
+ * Leerzeichen und Anführungszeichen am Rand weg, nur https, nur der Kalender-Export von Moodle
+ * (`/calendar/export_execute.php` mit `userid` und `authtoken`), Export-Voreinstellungen gesetzt.
+ * Fehlermeldungen enthalten den Link nie.
+ */
+export function normalisiereMoodleLink(eingabe: string): string {
+  const url = eingabe
+    .trim()
+    .replace(/^["'„“”‚‘’<]+|["'„“”‚‘’>]+$/g, '')
+    .trim();
   if (!/^https:\/\//i.test(url)) {
     throw new ImportFehler('Der Link muss mit https:// beginnen.');
   }
   if (!/^https:\/\/[^\s/?#]+\.[^\s/?#]+(?:[/?#]\S*)?$/i.test(url)) {
     throw new ImportFehler('Das sieht nicht nach einem gültigen Link aus.');
   }
-  return url;
+
+  const [pfad, abfrage = ''] = url.split('#')[0].split('?');
+  const istExportLink =
+    /\/calendar\/export_execute\.php$/i.test(pfad) &&
+    /(^|&)userid=[^&]+/.test(abfrage) &&
+    /(^|&)authtoken=[^&]+/.test(abfrage);
+  if (!istExportLink) {
+    throw new ImportFehler(
+      'Das ist nicht der Export-Link des Kalenders. In Moodle: Kalender → Exportieren → „Kalender-URL abfragen“ ' +
+        'und den angezeigten Link kopieren.',
+    );
+  }
+  return mitExportVoreinstellungen(url);
 }
 
 /** Ruft den Kalender ab. Wirft `ImportFehler`, wenn die Antwort kein Kalender ist. */

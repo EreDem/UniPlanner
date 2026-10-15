@@ -60,6 +60,7 @@ Zeitzone: Den Berliner UTC-Offset berechnet `src/zeit.ts` selbst (EU-Sommerzeitr
 ## Datenquelle: Moodle-Kalender
 
 - Format: iCalendar (.ics), abgerufen über die Kalender-URL aus RWTHmoodle (Kalender → Exportieren → „Alle Termine“ → „Kalender-URL abfragen“).
+- Link-Format: `https://<moodle>/calendar/export_execute.php?userid=…&authtoken=…&preset_what=…&preset_time=…`. Beim Verbinden normalisiert die App den Link (`normalisiereMoodleLink` in `src/import/abruf.ts`): Leer- und Anführungszeichen am Rand weg, nur https und nur der Export-Link mit `userid` und `authtoken`, außerdem immer `preset_what=all` und `preset_time=recentupcoming` (größtes Zeitfenster). Der Token hängt nicht an den Presets. Beim Import wird das auch auf schon gespeicherte Links angewendet (`mitExportVoreinstellungen`), sonst würden bei anderer Wahl in Moodle still Termine fehlen und künftige als „entfernt“ markiert.
 - Relevante Felder: `UID`, `SUMMARY`, `DESCRIPTION`, `DTSTART`, `DTEND`, `LOCATION`, `CATEGORIES` (= Modul, z. B. `(VU) IT-Sicherheit`), `LAST-MODIFIED`.
 - Zeiten sind in UTC (`Z`), Anzeige immer in Europe/Berlin.
 - Jeder Termin ist einzeln ausgerollt, es gibt kein `RRULE`.

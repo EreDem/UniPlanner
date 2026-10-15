@@ -10,7 +10,7 @@ import {
   setzeStatus,
   speichereEinstellungen,
 } from '@/db/repository';
-import { holeKalender, ImportFehler, pruefeUrl } from '@/import/abruf';
+import { holeKalender, ImportFehler, mitExportVoreinstellungen, normalisiereMoodleLink } from '@/import/abruf';
 import { importiere, ladeBeispieldaten, verbindeMoodle } from '@/import/importiere';
 import { domainVon } from '@/speicher/moodleLink';
 import { wochenbeginn } from '@/zeit';
@@ -54,16 +54,62 @@ async function fehlermeldung(versprechen: Promise<unknown>): Promise<string> {
   return meldung;
 }
 
-describe('pruefeUrl', () => {
-  it('akzeptiert https-Links', () => {
-    expect(pruefeUrl(`  ${LINK}  `)).toBe(LINK);
+describe('normalisiereMoodleLink', () => {
+  const VOREINSTELLUNGEN = 'preset_what=all&preset_time=recentupcoming';
+
+  it('ergänzt fehlende Export-Voreinstellungen', () => {
+    expect(normalisiereMoodleLink(LINK)).toBe(`${LINK}&${VOREINSTELLUNGEN}`);
   });
 
-  it('lehnt andere Links ab', async () => {
-    expect(() => pruefeUrl('http://moodle.example.org/x')).toThrow('https://');
-    expect(() => pruefeUrl('webcal://moodle.example.org/x')).toThrow('https://');
-    expect(() => pruefeUrl('https://')).toThrow(ImportFehler);
-    expect(() => pruefeUrl('https://kein leerzeichen.de')).toThrow(ImportFehler);
+  it('ersetzt abweichende Voreinstellungen und lässt den Rest unverändert', () => {
+    expect(
+      normalisiereMoodleLink(`${LINK}&preset_what=courses&preset_time=weeknow&lang=de#oben`),
+    ).toBe(`${LINK}&lang=de&${VOREINSTELLUNGEN}`);
+  });
+
+  it('entfernt Leerzeichen und Anführungszeichen am Rand', () => {
+    for (const eingabe of [`  ${LINK}  `, `"${LINK}"`, `„${LINK}“`, `<${LINK}>`, `\n'${LINK}'\n`]) {
+      expect(normalisiereMoodleLink(eingabe)).toBe(`${LINK}&${VOREINSTELLUNGEN}`);
+    }
+  });
+
+  it('lehnt Links ab, die nicht mit https beginnen', () => {
+    expect(() => normalisiereMoodleLink('http://moodle.example.org/x')).toThrow('https://');
+    expect(() => normalisiereMoodleLink('webcal://moodle.example.org/x')).toThrow('https://');
+    expect(() => normalisiereMoodleLink('https://')).toThrow(ImportFehler);
+    expect(() => normalisiereMoodleLink('https://kein leerzeichen.de')).toThrow(ImportFehler);
+  });
+
+  it('erkennt Links, die nicht der Kalender-Export sind, ohne den Link zu verraten', () => {
+    const falsch = [
+      'https://moodle.example.org/calendar/view.php?view=month',
+      'https://moodle.example.org/calendar/export_execute.php?userid=1',
+      'https://moodle.example.org/calendar/export_execute.php?authtoken=GEHEIMERTOKEN123',
+      'https://moodle.example.org/export_execute.php.html?userid=1&authtoken=GEHEIMERTOKEN123',
+    ];
+    for (const link of falsch) {
+      let meldung = '';
+      try {
+        normalisiereMoodleLink(link);
+      } catch (fehler) {
+        meldung = (fehler as Error).message;
+      }
+      expect([link, meldung]).toEqual([link, expect.stringContaining('Export-Link')]);
+      expect(meldung).not.toContain('GEHEIMERTOKEN123');
+    }
+  });
+});
+
+describe('mitExportVoreinstellungen', () => {
+  it('setzt die Voreinstellungen auch bei bereits gespeicherten Links', () => {
+    expect(mitExportVoreinstellungen(`${LINK}&preset_time=monthnow`)).toBe(
+      `${LINK}&preset_what=all&preset_time=recentupcoming`,
+    );
+  });
+
+  it('ist idempotent', () => {
+    const einmal = mitExportVoreinstellungen(LINK);
+    expect(mitExportVoreinstellungen(einmal)).toBe(einmal);
   });
 });
 
@@ -118,12 +164,27 @@ describe('domainVon', () => {
     expect(await ladeEvents(db)).toEqual([]);
   });
 
-  it('speichert Link und Daten nach erfolgreichem Testabruf', async () => {
+  it('speichert den normalisierten Link und die Daten nach erfolgreichem Testabruf', async () => {
+    const normalisiert = `${LINK}&preset_what=all&preset_time=recentupcoming`;
     fetchMock.mockReturnValue(antwort(beispielIcs));
-    await verbindeMoodle(db, LINK);
-    expect([...mockSecureStore.values()]).toEqual([LINK]);
+    await verbindeMoodle(db, `"${LINK}&preset_time=weeknow"`);
+    expect(fetchMock).toHaveBeenCalledWith(normalisiert, expect.anything());
+    expect([...mockSecureStore.values()]).toEqual([normalisiert]);
     expect(await ladeEvents(db)).toHaveLength(16);
     expect((await ladeAbrufInfo(db)).letzterAbrufMs).not.toBeNull();
+  });
+
+  it('ruft auch alte, nicht normalisierte Links mit den richtigen Voreinstellungen ab', async () => {
+    mockSecureStore.set('moodle_kalender_url', `${LINK}&preset_what=courses&preset_time=weeknow`);
+    fetchMock.mockReturnValue(antwort(beispielIcs));
+    await importiere(db);
+    expect(fetchMock).toHaveBeenCalledWith(`${LINK}&preset_what=all&preset_time=recentupcoming`, expect.anything());
+  });
+
+  it('speichert nichts, wenn der Link nicht der Kalender-Export ist', async () => {
+    await fehlermeldung(verbindeMoodle(db, 'https://moodle.example.org/calendar/view.php?view=month'));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockSecureStore.size).toBe(0);
   });
 
   it('behält bei Abruffehlern die Daten und speichert die Meldung', async () => {
