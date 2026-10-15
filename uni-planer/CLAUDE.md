@@ -102,6 +102,8 @@ Zeitzone: Den Berliner UTC-Offset berechnet `src/zeit.ts` selbst (EU-Sommerzeitr
 
 Einstellungen: Vorlesungen standardmäßig `erledigt`, oder nur Abgaben anzeigen.
 
+Unten rechts in der To-do-Liste: „Zu Moodle ↗“ (öffnet die Moodle-Startseite im Standard-Browser, nur die Domain des gespeicherten Links, nie der Link mit Token; ohne Link RWTHmoodle; `moodleStartseite`) und „+“ (Event anlegen).
+
 Module ausblenden (Einstellungen → Module): Der Schalter am Modul blendet das ganze Modul aus. Aufgeklappt (Pfeil) lassen sich die Kategorien einzeln ausblenden: Vorlesungen, Übungen, Abgaben (`kategorieVon`). „Übungen“ heißt in der App alles, was keine Vorlesung ist (Übung, Tutorium, Praktikum …), vorläufiger Name. Ist das ganze Modul aus, bleiben die Kategorie-Schalter erhalten, sind aber ausgegraut. Gilt für To-do-Liste und Erledigt-Tab; ein Import ändert nichts daran.
 
 Einzelne Events ausblenden: in der Detailansicht („Ausblenden“). Zurückholen über Einstellungen → Ausgeblendet (`ausgeblendet.tsx`): listet alle **vom Nutzer** ausgeblendeten Events nach Datum (`ladeVomNutzerAusgeblendet`, `baueAusgeblendetListe`) mit Knopf „Einblenden“ und Rückgängig-Leiste. Vom Import ausgeblendete Öffnungs-Marker und Events vor dem Startdatum stehen dort bewusst nicht.

@@ -12,7 +12,7 @@ import {
 } from '@/db/repository';
 import { holeKalender, ImportFehler, mitExportVoreinstellungen, normalisiereMoodleLink } from '@/import/abruf';
 import { importiere, ladeBeispieldaten, verbindeMoodle } from '@/import/importiere';
-import { domainVon } from '@/speicher/moodleLink';
+import { domainVon, moodleStartseite } from '@/speicher/moodleLink';
 import { wochenbeginn } from '@/zeit';
 
 import beispielIcs from './fixtures/beispiel.ics';
@@ -146,6 +146,19 @@ describe('holeKalender', () => {
 describe('domainVon', () => {
   it('zeigt nur die Domain', () => {
     expect(domainVon(LINK)).toBe('moodle.example.org');
+  });
+});
+
+describe('moodleStartseite', () => {
+  it('öffnet die Startseite des eigenen Moodle, nie den Link mit Token', () => {
+    const startseite = moodleStartseite(domainVon(LINK));
+    expect(startseite).toBe('https://moodle.example.org/');
+    expect(startseite).not.toContain('GEHEIMERTOKEN123');
+  });
+
+  it('nimmt ohne gespeicherten Link RWTHmoodle', () => {
+    expect(moodleStartseite(null)).toBe('https://moodle.rwth-aachen.de/');
+    expect(moodleStartseite('böse/domain?x')).toBe('https://moodle.rwth-aachen.de/');
   });
 });
 
