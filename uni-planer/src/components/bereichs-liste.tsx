@@ -18,10 +18,12 @@ import { setzeStatus } from '@/db/repository';
 import { useTheme } from '@/hooks/use-theme';
 import {
   anzeigeTitel,
+  istAbgeschlossen,
   istErledigt,
   stapleNachModul,
   STATUS_TEXT,
   type BereichSchluessel,
+  type EventTyp,
   type ListenPosten,
   type Status,
   type ToDoBereich,
@@ -31,6 +33,15 @@ import { formatiere } from '@/zeit';
 
 /** In diesen Bereichen werden mehrere Vorlesungen eines Moduls zu einem Stapel. */
 const GESTAPELTE_BEREICHE: readonly BereichSchluessel[] = ['nachzuarbeiten', 'erledigte-vorlesungen'];
+
+/**
+ * Bleibt ein Eintrag mit diesem Status in seinem Bereich? Erledigt-Tab: nur Erledigtes
+ * (verpasste Abgaben nicht). To-do-Liste: nur, was noch zu tun ist.
+ */
+function gehoertInBereich(bereich: BereichSchluessel, typ: EventTyp, status: Status): boolean {
+  if (bereich === 'erledigte-abgaben' || bereich === 'erledigte-vorlesungen') return istErledigt(typ, status);
+  return !istAbgeschlossen(typ, status);
+}
 
 /** Kurze, eindeutige Bezeichnung für Statusauswahl und Rückgängig-Leiste, z. B. „Analysis · Mo 05.10.“. */
 export function bezeichnung({ event, modul }: ToDoEintrag): string {
@@ -83,13 +94,14 @@ export function BereichsListe({
     await setzeStatus(db, event.id, neu);
     meldeAenderung();
 
-    // Unter „Heute“ bleibt die Vorlesung stehen, dort gibt es nichts rückgängig zu machen.
-    const jetztErledigt = istErledigt(event.typ, neu);
-    if (bereich !== 'heute' && jetztErledigt !== istErledigt(event.typ, alt)) {
+    // Rückgängig nur, wenn der Eintrag dadurch aus dieser Liste verschwindet. Unter „Heute“ bleibt er stehen.
+    if (bereich !== 'heute' && !gehoertInBereich(bereich, event.typ, neu)) {
       // War das die letzte Vorlesung im offenen Stapel, schließt sich das Popup.
       if (stapelEintraege.length <= 1 && stapelEintraege.some((e) => e.event.id === event.id)) setOffenerStapel(null);
       zeigeRueckgaengig(
-        jetztErledigt ? `${STATUS_TEXT[neu]}: ${bezeichnung(eintrag)}` : `Wieder offen: ${bezeichnung(eintrag)}`,
+        istAbgeschlossen(event.typ, neu)
+          ? `${STATUS_TEXT[neu]}: ${bezeichnung(eintrag)}`
+          : `Wieder offen: ${bezeichnung(eintrag)}`,
         async () => {
           await setzeStatus(db, event.id, vorher);
           meldeAenderung();

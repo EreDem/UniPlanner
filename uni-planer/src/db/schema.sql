@@ -1,5 +1,5 @@
 
--- SQLite-Schema des Uni-Planers (expo-sqlite), aktueller Stand = Version 5.
+-- SQLite-Schema des Uni-Planers (expo-sqlite), aktueller Stand = Version 7 (6 ist eine leere Migration, siehe migrationen/006-leer.sql).
 -- Neue Installationen führen diese Datei aus; bestehende werden über src/db/migrationen/ aktualisiert
 -- (siehe src/db/db.ts, PRAGMA user_version). Änderungen hier immer auch als Migration anlegen.
 -- Zeitpunkte sind UTC-Millisekunden, Spalten enden auf _ms. Wahrheitswerte sind 0/1.
@@ -56,8 +56,8 @@ CREATE INDEX event_uid_event ON event_uid (event_id);
 CREATE TABLE status (
   event_id     TEXT    PRIMARY KEY REFERENCES event (id) ON DELETE CASCADE,
   status       TEXT    NOT NULL CHECK (status IN (
-                 'nachzuarbeiten', 'erledigt', 'ausstehend', 'angefangen', 'abgegeben'
-               )),
+                 'nachzuarbeiten', 'erledigt', 'ausstehend', 'angefangen', 'abgegeben', 'verpasst'
+               )),                                       -- 'verpasst' seit Version 7
   geaendert_ms INTEGER NOT NULL
 );
 

@@ -1,6 +1,6 @@
 # Datenmodell
 
-Quelle der Wahrheit für das Schema ist [`src/db/schema.sql`](../src/db/schema.sql) (aktueller Stand, Version 5; bestehende Installationen werden über [`src/db/migrationen/`](../src/db/migrationen/) aktualisiert), für Typen und Kernregeln [`src/model/types.ts`](../src/model/types.ts).
+Quelle der Wahrheit für das Schema ist [`src/db/schema.sql`](../src/db/schema.sql) (aktueller Stand, Version 7; bestehende Installationen werden über [`src/db/migrationen/`](../src/db/migrationen/) aktualisiert), für Typen und Kernregeln [`src/model/types.ts`](../src/model/types.ts).
 
 ## Tabellen
 
@@ -112,7 +112,12 @@ stateDiagram-v2
     angefangen --> erledigt
     erledigt --> abgegeben
     ausstehend --> abgegeben
+    ausstehend --> verpasst
+    angefangen --> verpasst
+    erledigt --> verpasst
     abgegeben --> [*] : wandert in den Erledigt-Tab
+    verpasst --> [*] : nur noch auf der Modulseite
 ```
 
 `erledigt` = fertig bearbeitet, aber noch nicht abgegeben (z. B. Warten auf Abgabepartner).
+`verpasst` = Frist verstrichen, Abgabe nicht mehr möglich; zählt mit eingetragener Maximalpunktzahl als 0 Punkte.

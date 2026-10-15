@@ -104,6 +104,19 @@ describe('verarbeite mit der Beispiel-Fixture', () => {
     expect(ergebnis.events.every((e) => e.quelle === 'moodle' && e.entferntMs === null)).toBe(true);
   });
 
+  it('zeigt am 09.10. das Tutorium unter „Heute“', () => {
+    const jetzt = berlinZuUtc(2026, 10, 9, 12, 0);
+    const bereiche = baueToDoListe({
+      ...ergebnis,
+      status: new Map(),
+      einstellungen: STANDARD_EINSTELLUNGEN,
+      jetztMs: jetzt,
+      heute: tagesgrenzen(jetzt),
+    });
+    const heute = bereiche.find((b) => b.schluessel === 'heute')!;
+    expect(heute.eintraege.map((e) => [e.event.id, istVorlesung(e.event)])).toEqual([[uid(2018), false]]);
+  });
+
   it('ergibt am 14.10. Stapel unter „Nachzuarbeiten“', () => {
     const jetzt = berlinZuUtc(2026, 10, 14, 12, 0);
     const bereiche = baueToDoListe({

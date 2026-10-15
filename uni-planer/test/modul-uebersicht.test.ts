@@ -193,6 +193,36 @@ describe('baueModulUebersicht', () => {
       ['abgegeben', false],
     ]);
   });
+
+  it('zeigt verpasste Abgaben, nicht als überfällig, und zählt sie mit 0 Punkten', () => {
+    const status = new Map<string, Status>([
+      ['verpasst', 'verpasst'],
+      ['verpasst-ohne-max', 'verpasst'],
+      ['verpasst-kuenftig', 'verpasst'],
+      ['bewertet', 'abgegeben'],
+    ]);
+    const punkte = new Map<string, Punkte>([
+      ['verpasst', { erreicht: null, max: 10 }],
+      ['bewertet', { erreicht: 8, max: 10 }],
+    ]);
+    const uebersicht = baueModulUebersicht(
+      eingabe(
+        [abgabe('verpasst', 12), abgabe('verpasst-ohne-max', 13), abgabe('verpasst-kuenftig', 26), abgabe('bewertet', 14)],
+        { status },
+      ),
+      modul('analysis'),
+      punkte,
+    );
+    const abgaben = uebersicht.kategorien.find((k) => k.kategorie === 'abgaben')!;
+    expect(abgaben.eintraege.map((e) => [e.event.id, e.status, e.ueberfaellig])).toEqual([
+      ['verpasst', 'verpasst', false],
+      ['verpasst-ohne-max', 'verpasst', false],
+      ['bewertet', 'abgegeben', false],
+      ['verpasst-kuenftig', 'verpasst', false],
+    ]);
+    // 0 von 10 für die verpasste Abgabe mit Maximum, 8 von 10 für die bewertete.
+    expect(uebersicht.punkte).toEqual({ erreicht: 8, max: 20, prozent: 40, bewertet: 2 });
+  });
 });
 
 describe('baueModulListe', () => {

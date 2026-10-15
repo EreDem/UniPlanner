@@ -34,7 +34,7 @@ const TOENE: Record<Schema, Record<Ton, { hintergrund: string; text: string }>> 
 };
 
 /**
- * Offen/ausstehend neutral, angefangen gelblich, erledigt blau,
+ * Offen/ausstehend und verpasst neutral, angefangen gelblich, erledigt blau,
  * abgegeben bzw. erledigte Vorlesung grün, überfällig rot.
  */
 export function statusFarben(schema: Schema, typ: EventTyp, status: Status, ueberfaellig = false) {

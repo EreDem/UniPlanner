@@ -221,6 +221,32 @@ async function importiere(db: Db, roh: RohEvent[] = ROH, jetzt = JETZT) {
     expect(await anzahl(db, 'event')).toBe(16);
   });
 
+  it('behält beim Upgrade vorhandene Status und erlaubt danach „verpasst“', async () => {
+    const alt = erzeugeTestDb();
+    await alt.execAsync(schemaV1);
+    await alt.execAsync(`
+      PRAGMA user_version = 1;
+      PRAGMA foreign_keys = ON;
+      INSERT INTO event (id, typ, quelle, titel, start_ms, ende_ms) VALUES ('blatt', 'abgabe', 'moodle', 'Blatt 1', 0, 0);
+      INSERT INTO status (event_id, status, geaendert_ms) VALUES ('blatt', 'angefangen', 1);
+    `);
+
+    await migriere(alt);
+
+    expect((await ladeStatus(alt)).get('blatt')).toBe('angefangen');
+    await setzeStatus(alt, 'blatt', 'verpasst', JETZT);
+    expect((await ladeStatus(alt)).get('blatt')).toBe('verpasst');
+    // Der Fremdschlüssel zum Event gilt weiter: Löschen des Events nimmt den Status mit.
+    await alt.runAsync("DELETE FROM event WHERE id = 'blatt'");
+    expect(await anzahl(alt, 'status')).toBe(0);
+  });
+
+  it('speichert den Status „verpasst“', async () => {
+    await importiere(db);
+    await setzeStatus(db, uid(2008), 'verpasst', JETZT);
+    expect((await ladeStatus(db)).get(uid(2008))).toBe('verpasst');
+  });
+
   it('stellt mit null den Standardstatus wieder her (Rückgängig)', async () => {
     await importiere(db);
     await setzeStatus(db, uid(2008), 'abgegeben', JETZT);

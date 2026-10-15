@@ -4,11 +4,12 @@
 import { summierePunkte, type Punkte, type PunkteSumme } from './angaben';
 import {
   effektiverStatus,
-  istErledigt,
+  istAbgeschlossen,
   istVorStartdatum,
   kategorieVon,
   type Kategorie,
   type Modul,
+  type Status,
   type ToDoEingabe,
   type ToDoEintrag,
 } from './types';
@@ -28,9 +29,15 @@ export interface ModulUebersicht {
 
 const KEINE_PUNKTE: Punkte = { erreicht: null, max: null };
 
+/** Eine verpasste Abgabe mit eingetragener Maximalpunktzahl zählt mit 0 erreichten Punkten. */
+function punkteFuer(punkte: Punkte | undefined, status: Status): Punkte {
+  const p = punkte ?? KEINE_PUNKTE;
+  return status === 'verpasst' ? { erreicht: p.erreicht ?? 0, max: p.max } : p;
+}
+
 /**
  * Alle bisherigen Events des Moduls: begonnen bzw. Frist erreicht, oder vom Nutzer schon
- * abgehakt (z. B. vor der Frist abgegebene Abgaben). Nur über den Standard „erledigt“ zählt nicht,
+ * abgehakt (z. B. vor der Frist abgegebene Abgaben). Auch verpasste Abgaben stehen hier. Nur über den Standard „erledigt“ zählt nicht,
  * sonst stünden bei dieser Einstellung alle künftigen Vorlesungen hier.
  * Es fehlen ausgeblendete Events (z. B. Öffnungs-Marker), Moodle-Events vor dem Startdatum und
  * aus Moodle entfernte Vorlesungen. Die Ausblende-Schalter für Module und Kategorien gelten nur
@@ -50,11 +57,11 @@ export function baueModulUebersicht(
     if (event.typ === 'vorlesung' && event.entferntMs !== null) continue;
 
     const gespeichert = eingabe.status.get(event.id);
-    const schonAbgehakt = gespeichert !== undefined && istErledigt(event.typ, gespeichert);
+    const schonAbgehakt = gespeichert !== undefined && istAbgeschlossen(event.typ, gespeichert);
     if (event.startMs > jetztMs && !schonAbgehakt) continue;
 
     const status = effektiverStatus(event.typ, gespeichert, einstellungen);
-    const ueberfaellig = event.typ === 'abgabe' && !istErledigt(event.typ, status) && event.startMs < jetztMs;
+    const ueberfaellig = event.typ === 'abgabe' && !istAbgeschlossen(event.typ, status) && event.startMs < jetztMs;
     nachKategorie.get(kategorieVon(event))!.push({ event, modul, status, ueberfaellig });
   }
 
@@ -68,7 +75,7 @@ export function baueModulUebersicht(
   return {
     modul,
     kategorien,
-    punkte: summierePunkte(abgaben.map(({ event }) => punkte.get(event.id) ?? KEINE_PUNKTE)),
+    punkte: summierePunkte(abgaben.map(({ event, status }) => punkteFuer(punkte.get(event.id), status))),
     nachzuarbeiten: vorlesungen.filter((e) => e.status === 'nachzuarbeiten' && e.event.endeMs <= jetztMs).length,
   };
 }

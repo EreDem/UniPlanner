@@ -4,12 +4,14 @@ import {
   baueErledigtListe,
   baueToDoListe,
   effektiverStatus,
+  istAbgeschlossen,
   istErledigt,
   istVorlesung,
   kategorieVon,
   KEINE_KATEGORIE_AUSGEBLENDET,
   stapleNachModul,
   STANDARD_EINSTELLUNGEN,
+  STATUS_WERTE,
   type Modul,
   type Status,
   type ToDoEingabe,
@@ -88,6 +90,27 @@ describe('baueToDoListe', () => {
       abgaben: ['frist-ueberfaellig', 'frist-bald', 'frist-spaet'],
       nachzuarbeiten: ['letzte-woche', 'gestern'],
     });
+  });
+
+  it('nimmt verpasste Abgaben aus der To-do-Liste und aus dem Erledigt-Tab', () => {
+    const status = new Map<string, Status>([
+      ['verpasst', 'verpasst'],
+      ['abgegeben', 'abgegeben'],
+    ]);
+    const events = [abgabe('verpasst', 18), abgabe('abgegeben', 19), abgabe('offen', 18)];
+    expect(ids(liste(events, { status }))).toEqual({ abgaben: ['offen'] });
+    expect(
+      ids(
+        baueErledigtListe({
+          events,
+          module: MODULE,
+          status,
+          einstellungen: STANDARD_EINSTELLUNGEN,
+          jetztMs: JETZT,
+          heute: tagesgrenzen(JETZT),
+        }),
+      ),
+    ).toEqual({ 'erledigte-abgaben': ['abgegeben'] });
   });
 
   it('markiert überfällige Abgaben', () => {
@@ -470,6 +493,23 @@ describe('istErledigt', () => {
     expect(istErledigt('vorlesung', 'nachzuarbeiten')).toBe(false);
     expect(istErledigt('abgabe', 'abgegeben')).toBe(true);
     expect(istErledigt('abgabe', 'erledigt')).toBe(false);
+    expect(istErledigt('abgabe', 'verpasst')).toBe(false);
+  });
+});
+
+describe('istAbgeschlossen', () => {
+  it('zählt Erledigtes und verpasste Abgaben, aber nicht Offenes', () => {
+    expect(istAbgeschlossen('abgabe', 'verpasst')).toBe(true);
+    expect(istAbgeschlossen('abgabe', 'abgegeben')).toBe(true);
+    expect(istAbgeschlossen('abgabe', 'erledigt')).toBe(false);
+    expect(istAbgeschlossen('vorlesung', 'erledigt')).toBe(true);
+    expect(istAbgeschlossen('vorlesung', 'nachzuarbeiten')).toBe(false);
+  });
+
+  it('bietet „Verpasst“ nur bei Abgaben an', () => {
+    expect(STATUS_WERTE.abgabe).toContain('verpasst');
+    expect(STATUS_WERTE.vorlesung).not.toContain('verpasst');
+    expect(effektiverStatus('vorlesung', 'verpasst', STANDARD_EINSTELLUNGEN)).toBe('nachzuarbeiten');
   });
 });
 

@@ -9,14 +9,17 @@ export type Quelle = 'moodle' | 'manuell';
 
 export type VorlesungStatus = 'nachzuarbeiten' | 'erledigt';
 
-/** `erledigt` = fertig bearbeitet, aber noch nicht abgegeben. Erst `abgegeben` entfernt sie aus der To-do-Liste. */
-export type AbgabeStatus = 'ausstehend' | 'angefangen' | 'erledigt' | 'abgegeben';
+/**
+ * `erledigt` = fertig bearbeitet, aber noch nicht abgegeben. Erst `abgegeben` oder `verpasst`
+ * entfernen sie aus der To-do-Liste. `verpasst` = Frist verstrichen, Abgabe nicht mehr möglich.
+ */
+export type AbgabeStatus = 'ausstehend' | 'angefangen' | 'erledigt' | 'abgegeben' | 'verpasst';
 
 export type Status = VorlesungStatus | AbgabeStatus;
 
 export const STATUS_WERTE = {
   vorlesung: ['nachzuarbeiten', 'erledigt'],
-  abgabe: ['ausstehend', 'angefangen', 'erledigt', 'abgegeben'],
+  abgabe: ['ausstehend', 'angefangen', 'erledigt', 'abgegeben', 'verpasst'],
 } as const satisfies { vorlesung: readonly VorlesungStatus[]; abgabe: readonly AbgabeStatus[] };
 
 export const STATUS_TEXT: Record<Status, string> = {
@@ -25,6 +28,7 @@ export const STATUS_TEXT: Record<Status, string> = {
   ausstehend: 'Ausstehend',
   angefangen: 'Angefangen',
   abgegeben: 'Abgegeben',
+  verpasst: 'Verpasst',
 };
 
 export interface Modul {
@@ -227,12 +231,26 @@ export interface ToDoEingabe {
 }
 
 /**
- * Ist das Event abgeschlossen und gehört in den Erledigt-Tab statt in die To-do-Liste?
- * Vorlesung: `erledigt`. Abgabe: erst `abgegeben`, denn `erledigt` heißt dort
- * „fertig, aber noch nicht hochgeladen“ und bleibt bewusst in der To-do-Liste.
+ * Gehört das Event in den Erledigt-Tab? Vorlesung: `erledigt`. Abgabe: erst `abgegeben`, denn
+ * `erledigt` heißt dort „fertig, aber noch nicht hochgeladen“ und bleibt bewusst in der To-do-Liste.
  */
 export function istErledigt(typ: EventTyp, status: Status): boolean {
   return typ === 'vorlesung' ? status === 'erledigt' : status === 'abgegeben';
+}
+
+/**
+ * Ist nichts mehr zu tun, sodass das Event aus der To-do-Liste verschwindet? Erledigt (siehe
+ * `istErledigt`) oder eine verpasste Abgabe. Verpasste Abgaben stehen nicht im Erledigt-Tab,
+ * sondern nur noch auf der Modulseite.
+ */
+export function istAbgeschlossen(typ: EventTyp, status: Status): boolean {
+  return istErledigt(typ, status) || (typ === 'abgabe' && status === 'verpasst');
+}
+
+/** Moodle-Event vor dem Startdatum? Solche Events zeigt die App nirgends an. */
+export function istVorStartdatum(event: UniEvent, einstellungen: Einstellungen): boolean {
+  const startdatum = einstellungen.startdatumMs;
+  return startdatum !== null && event.quelle === 'moodle' && event.startMs < startdatum;
 }
 
 /**
@@ -242,12 +260,6 @@ export function istErledigt(typ: EventTyp, status: Status): boolean {
  * Moodle entfernte Vorlesungen (z. B. ausgefallene Termine). Entfernte Abgaben bleiben sichtbar,
  * damit eine verschwundene Frist nicht unbemerkt untergeht.
  */
-/** Moodle-Event vor dem Startdatum? Solche Events zeigt die App nirgends an. */
-export function istVorStartdatum(event: UniEvent, einstellungen: Einstellungen): boolean {
-  const startdatum = einstellungen.startdatumMs;
-  return startdatum !== null && event.quelle === 'moodle' && event.startMs < startdatum;
-}
-
 function sichtbareEintraege(eingabe: ToDoEingabe): ToDoEintrag[] {
   const { einstellungen, jetztMs } = eingabe;
   const modulNachId = new Map(eingabe.module.map((modul) => [modul.id, modul]));
@@ -260,7 +272,7 @@ function sichtbareEintraege(eingabe: ToDoEingabe): ToDoEintrag[] {
     if (event.typ === 'vorlesung' && (einstellungen.nurAbgaben || event.entferntMs !== null)) return [];
 
     const status = effektiverStatus(event.typ, eingabe.status.get(event.id), einstellungen);
-    const ueberfaellig = event.typ === 'abgabe' && !istErledigt(event.typ, status) && event.startMs < jetztMs;
+    const ueberfaellig = event.typ === 'abgabe' && !istAbgeschlossen(event.typ, status) && event.startMs < jetztMs;
     return [{ event, modul, status, ueberfaellig }];
   });
 }
@@ -273,7 +285,7 @@ function istHeute(event: UniEvent, heute: ToDoEingabe['heute']): boolean {
  * Baut die To-do-Liste:
  * 1. Heute – alle heutigen Veranstaltungen nach Beginn (Vorlesungen, Übungen, Tutorien …),
  *    auch erledigte Vorlesungen (die bleiben bis Tagesende stehen)
- * 2. Abgaben – alle nicht abgegebenen, nach Deadline
+ * 2. Abgaben – alle nicht abgegebenen und nicht verpassten, nach Deadline
  * 3. Nachzuarbeiten – nicht erledigte vergangene Vorlesungen (vor heute), älteste zuerst;
  *    andere Veranstaltungen landen hier nie (siehe `istVorlesung`)
  * Leere Bereiche werden weggelassen.
@@ -291,7 +303,7 @@ export function baueToDoListe(eingabe: ToDoEingabe): ToDoBereich[] {
       continue;
     }
     if (event.typ === 'vorlesung' && !istVorlesung(event)) continue;
-    if (istErledigt(event.typ, status)) continue;
+    if (istAbgeschlossen(event.typ, status)) continue;
 
     if (event.typ === 'abgabe') abgaben.push(eintrag);
     else if (event.startMs < heute.startMs && event.endeMs <= jetztMs) nachzuarbeiten.push(eintrag);

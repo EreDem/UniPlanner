@@ -49,7 +49,9 @@ docs/datenmodell.md     Diagramme (Mermaid)
 prototyp.md             Spezifikation des ersten Prototyps
 ```
 
-Schemaänderungen: immer beides anpassen, `schema.sql` und eine neue Datei in `src/db/migrationen/` (in `db.ts` als Upgrade eintragen, `SCHEMA_VERSION` erhöhen). Ein Test prüft, dass ein Upgrade ab Version 1 (Schnappschuss `test/fixtures/schema-v1.sql`, nie ändern) denselben Stand ergibt wie eine Neuinstallation. Im Schema keine Spalten per `DROP COLUMN` entfernen: SQLite scheitert daran bei Kommentaren in `CREATE TABLE`.
+Schemaänderungen: immer beides anpassen, `schema.sql` und eine neue Datei in `src/db/migrationen/` (in `db.ts` als Upgrade eintragen, `SCHEMA_VERSION` erhöhen). Ein Test prüft, dass ein Upgrade ab Version 1 (Schnappschuss `test/fixtures/schema-v1.sql`, nie ändern) denselben Stand ergibt wie eine Neuinstallation. Im Schema keine Spalten per `DROP COLUMN` entfernen: SQLite scheitert daran bei Kommentaren in `CREATE TABLE`. Migration 6 ist absichtlich leer (Nummer war für den verworfenen RWTHonline-Import vergeben). Migration 7 baut die Tabelle `status` neu auf (neuer Status `verpasst`); CHECK-Bedingungen lassen sich in SQLite nur so ändern.
+
+Plattformen: nur Android und iOS (`platforms` in `app.json`). Web ist bewusst aus: `expo-sqlite` braucht im Browser WebAssembly und bricht den Web-Build ab („Worker chunk not found … expo-sqlite/web/worker.ts“).
 
 Tests: `npm test`. Repository-Tests laufen gegen das echte `schema.sql` mit `node:sqlite` (Node ≥ 22.5), sonst werden sie übersprungen.
 
@@ -61,6 +63,10 @@ Zeitzone: Den Berliner UTC-Offset berechnet `src/zeit.ts` selbst (EU-Sommerzeitr
 - Relevante Felder: `UID`, `SUMMARY`, `DESCRIPTION`, `DTSTART`, `DTEND`, `LOCATION`, `CATEGORIES` (= Modul, z. B. `(VU) IT-Sicherheit`), `LAST-MODIFIED`.
 - Zeiten sind in UTC (`Z`), Anzeige immer in Europe/Berlin.
 - Jeder Termin ist einzeln ausgerollt, es gibt kein `RRULE`.
+- Echter RWTH-Export (geprüft 15.10.2026): Kurstermine heißen „<Kursname> [VO]“ bzw. „[VU]“, „[PR]“, `CATEGORIES` = „(VO) <Kursname>“. Tutorien und Übungsgruppen (TU, UE) stehen **nicht** im Moodle-Export, auch nicht unter anderem Namen; sie gibt es nur in RWTHonline. Fristen und Anmeldungen kommen als Events ohne Dauer („… ist fällig“, „… opens/closes“).
+- **Bewusste Entscheidung (15.10.2026): Moodle bleibt die einzige Quelle.** Die App soll den RWTH-Kalender nicht ersetzen, sondern Vorlesungen und Abgaben tracken. Ein Import des RWTHonline-Stundenplans (nur als .ics-Download möglich) wurde gebaut und wieder verworfen: zu ambitioniert und zu viel Verantwortung. Nicht erneut vorschlagen, außer der Nutzer fragt danach.
+- **Bewusste Entscheidung (15.10.2026): Keine manuellen Übungen im Prototyp.** Manuell angelegte Übungen (nur unter „Heute“) wurden gebaut und wieder verworfen: Wöchentliche Wiederholung bräuchte eine Übersicht eingerichteter Veranstaltungen, das widerspricht dem Ziel einer möglichst intuitiven App.
+- Diagnose mit echten Daten: `npx jest --testRegex "werkzeuge/diagnose-kalender\.ts$"` liest den Link aus `MOODLE_URL` oder `.local` und zeigt, wie der Import die Termine einordnet (gibt den Link nie aus). Nur mit Zustimmung des Nutzers ausführen.
 
 ## Import-Regeln
 
@@ -80,10 +86,11 @@ Zeitzone: Den Berliner UTC-Offset berechnet `src/zeit.ts` selbst (EU-Sommerzeitr
   - Erscheint am Tag selbst unter „Heute“, danach unter „Nachzuarbeiten“.
   - Bewusste Entscheidung: Alle Vorlesungen erscheinen standardmäßig in der Liste, weil sie bearbeitet werden müssen.
   - `erledigt` hält sie aus „Nachzuarbeiten“ heraus. Unter „Heute“ bleibt sie bis Tagesende stehen (mit Badge „Erledigt“), danach erscheint sie im Erledigt-Tab.
-- **Abgabe**: `ausstehend` | `angefangen` | `erledigt` | `abgegeben`
+- **Abgabe**: `ausstehend` | `angefangen` | `erledigt` | `abgegeben` | `verpasst`
   - `erledigt` = fertig bearbeitet, aber noch nicht abgegeben (z. B. Warten auf Abgabepartner). Bleibt bewusst in der To-do-Liste.
   - Erst `abgegeben` entfernt sie aus der To-do-Liste.
-- Regel im Code: `istErledigt` in `src/model/types.ts`.
+  - `verpasst` = Frist verstrichen, Abgabe nicht mehr möglich (manuell gewählt). Entfernt sie ebenfalls aus der To-do-Liste, sie erscheint aber **nicht** im Erledigt-Tab, nur auf der Modulseite (graues Badge, nicht rot). Mit eingetragener Maximalpunktzahl zählt sie in der Punktesumme mit 0 Punkten.
+  - Regeln im Code: `istErledigt` (Erledigt-Tab) und `istAbgeschlossen` (verschwindet aus der To-do-Liste: erledigt oder verpasst) in `src/model/types.ts`.
 
 ## To-do-Liste
 
