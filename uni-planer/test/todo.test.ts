@@ -5,6 +5,7 @@ import {
   baueErledigtListe,
   baueToDoListe,
   effektiverStatus,
+  hatStatus,
   istAbgeschlossen,
   istErledigt,
   istVorlesung,
@@ -13,6 +14,7 @@ import {
   stapleNachModul,
   STANDARD_EINSTELLUNGEN,
   STATUS_WERTE,
+  statusNachAbhaken,
   type Modul,
   type Status,
   type ToDoEingabe,
@@ -541,6 +543,35 @@ describe('istAbgeschlossen', () => {
     expect(STATUS_WERTE.abgabe).toContain('verpasst');
     expect(STATUS_WERTE.vorlesung).not.toContain('verpasst');
     expect(effektiverStatus('vorlesung', 'verpasst', STANDARD_EINSTELLUNGEN)).toBe('nachzuarbeiten');
+  });
+});
+
+describe('statusNachAbhaken', () => {
+  it('hakt Abgaben als abgegeben und Vorlesungen als erledigt ab', () => {
+    for (const status of ['ausstehend', 'angefangen', 'erledigt', 'verpasst'] as const) {
+      expect(statusNachAbhaken('abgabe', status)).toBe('abgegeben');
+    }
+    expect(statusNachAbhaken('vorlesung', 'nachzuarbeiten')).toBe('erledigt');
+  });
+
+  it('nimmt das Häkchen zurück, wenn das Event schon erledigt ist', () => {
+    expect(statusNachAbhaken('abgabe', 'abgegeben')).toBe('ausstehend');
+    expect(statusNachAbhaken('vorlesung', 'erledigt')).toBe('nachzuarbeiten');
+  });
+
+  it('zeigt das Häkchen genau bei erledigten Events, auch wenn der Status manuell gewählt wurde', () => {
+    // Abgehakt = istErledigt; „erledigt“ bei Abgaben (noch nicht hochgeladen) zählt nicht.
+    expect(istErledigt('abgabe', statusNachAbhaken('abgabe', 'angefangen'))).toBe(true);
+    expect(istErledigt('abgabe', 'erledigt')).toBe(false);
+    expect(istErledigt('vorlesung', 'erledigt')).toBe(true);
+  });
+});
+
+describe('hatStatus', () => {
+  it('gibt Abgaben und Vorlesungen einen Status, anderen Veranstaltungen nicht', () => {
+    expect(hatStatus(abgabe('a', 22))).toBe(true);
+    expect(hatStatus(event({ id: 'v', titel: 'Vorlesung' }))).toBe(true);
+    expect(hatStatus(event({ id: 't', titel: 'Tutorium' }))).toBe(false);
   });
 });
 

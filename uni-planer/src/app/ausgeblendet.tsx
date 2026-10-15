@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { bezeichnung, ListenLeer } from '@/components/bereichs-liste';
 import { LEISTE_HOEHE, RueckgaengigLeiste } from '@/components/rueckgaengig-leiste';
 import { ToDoZeile } from '@/components/todo-zeile';
-import { Spacing } from '@/constants/theme';
+import { Rand, Schrift, Spacing } from '@/constants/theme';
 import { meldeAenderung, useDatenVersion } from '@/daten/aenderungen';
 import { zeigeRueckgaengig } from '@/daten/rueckgaengig';
 import type { Db } from '@/db/db';
@@ -62,18 +62,18 @@ export default function Ausgeblendet() {
     });
   }
 
-  if (!daten) return <View style={[styles.flaeche, { backgroundColor: theme.background }]} />;
+  if (!daten) return <View style={[styles.flaeche, { backgroundColor: theme.grund }]} />;
   const eintraege = baueAusgeblendetListe({ ...daten, jetztMs: jetzt });
 
   return (
-    <View style={[styles.flaeche, { backgroundColor: theme.background }]}>
+    <View style={[styles.flaeche, { backgroundColor: theme.grund }]}>
       <FlatList
         data={eintraege}
         keyExtractor={(eintrag) => eintrag.event.id}
-        contentContainerStyle={{ paddingBottom: abstandUnten + LEISTE_HOEHE + Spacing.five }}
+        contentContainerStyle={[styles.liste, { paddingBottom: abstandUnten + LEISTE_HOEHE + Spacing.five }]}
         ListHeaderComponent={
           eintraege.length > 0 ? (
-            <Text style={[styles.hinweis, { color: theme.textSecondary }]}>
+            <Text style={[styles.hinweis, { color: theme.text2 }]}>
               Diese Events hast du ausgeblendet. „Einblenden“ holt sie zurück in die Listen.
             </Text>
           ) : null
@@ -82,7 +82,7 @@ export default function Ausgeblendet() {
           <ListenLeer titel="Nichts ausgeblendet" text="Einzelne Events blendest du in ihrer Detailansicht aus." />
         }
         ListFooterComponent={
-          <Text style={[styles.hinweis, { color: theme.textSecondary }]}>
+          <Text style={[styles.hinweis, styles.fuss, { color: theme.text2 }]}>
             Ganze Module oder ihre Vorlesungen, Übungen und Abgaben blendest du unter Einstellungen → Module ein und
             aus.
           </Text>
@@ -92,6 +92,7 @@ export default function Ausgeblendet() {
             eintrag={item}
             bereich="abgaben"
             jetztMs={jetzt}
+            style={styles.zeile}
             onPress={() => router.push({ pathname: '/event/[id]', params: { id: item.event.id } })}
             aktion={{ titel: 'Einblenden', onPress: () => einblenden(item) }}
           />
@@ -104,5 +105,15 @@ export default function Ausgeblendet() {
 
 const styles = StyleSheet.create({
   flaeche: { flex: 1 },
-  hinweis: { fontSize: 13, lineHeight: 18, paddingHorizontal: Spacing.three, paddingVertical: Spacing.three },
+  liste: { flexGrow: 1, gap: Spacing.two },
+  zeile: { marginHorizontal: Rand.karte },
+  hinweis: {
+    fontFamily: Schrift.mittel,
+    fontSize: 14,
+    lineHeight: 20,
+    paddingHorizontal: Rand.titel,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.two,
+  },
+  fuss: { fontSize: 13, paddingTop: Spacing.three },
 });

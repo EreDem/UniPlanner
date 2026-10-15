@@ -5,7 +5,8 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Spacing } from '@/constants/theme';
+import { Karte, useFeldStil } from '@/components/bausteine';
+import { Schrift, Spacing } from '@/constants/theme';
 import { speichereModulAngabe } from '@/db/repository';
 import { useTheme } from '@/hooks/use-theme';
 import { MAX_MODUL_ANGABE_ZEICHEN, type ModulAngabe, type ModulAngaben } from '@/model/angaben';
@@ -19,13 +20,28 @@ const FELDER: { angabe: ModulAngabe; titel: string; platzhalter: string }[] = [
   },
 ];
 
-export function ModulAngabenFelder({ modulId, anfangswerte }: { modulId: string; anfangswerte: ModulAngaben }) {
+export function ModulAngabenFelder({
+  modulId,
+  anfangswerte,
+  onAendern,
+}: {
+  modulId: string;
+  anfangswerte: ModulAngaben;
+  /** Meldet jede Änderung, z. B. damit die Zulassungsgrenze im Punktebalken mitläuft. */
+  onAendern?: (angabe: ModulAngabe, text: string) => void;
+}) {
   return (
-    <View style={styles.felder}>
+    <Karte>
       {FELDER.map((feld) => (
-        <AngabeFeld key={feld.angabe} modulId={modulId} anfangswert={anfangswerte[feld.angabe]} {...feld} />
+        <AngabeFeld
+          key={feld.angabe}
+          modulId={modulId}
+          anfangswert={anfangswerte[feld.angabe]}
+          onAendern={onAendern}
+          {...feld}
+        />
       ))}
-    </View>
+    </Karte>
   );
 }
 
@@ -35,25 +51,29 @@ function AngabeFeld({
   titel,
   platzhalter,
   anfangswert,
+  onAendern,
 }: {
   modulId: string;
   angabe: ModulAngabe;
   titel: string;
   platzhalter: string;
   anfangswert: string | null;
+  onAendern?: (angabe: ModulAngabe, text: string) => void;
 }) {
   const db = useSQLiteContext();
   const theme = useTheme();
+  const feldStil = useFeldStil();
   const [text, setText] = useState(anfangswert ?? '');
 
   function aendere(neu: string) {
     setText(neu);
     speichereModulAngabe(db, modulId, angabe, neu);
+    onAendern?.(angabe, neu);
   }
 
   return (
     <View style={styles.feld}>
-      <Text style={[styles.titel, { color: theme.textSecondary }]}>{titel}</Text>
+      <Text style={[styles.titel, { color: theme.text2 }]}>{titel}</Text>
       <TextInput
         accessibilityLabel={titel}
         value={text}
@@ -61,16 +81,14 @@ function AngabeFeld({
         maxLength={MAX_MODUL_ANGABE_ZEICHEN}
         returnKeyType="done"
         placeholder={platzhalter}
-        placeholderTextColor={theme.textSecondary}
-        style={[styles.eingabe, { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.rand }]}
+        placeholderTextColor={theme.text2}
+        style={feldStil}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  felder: { marginHorizontal: Spacing.three, gap: Spacing.two },
-  feld: { gap: Spacing.one },
-  titel: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  eingabe: { minHeight: 44, borderRadius: 12, borderWidth: 1, paddingHorizontal: Spacing.three, fontSize: 15 },
+  feld: { gap: Spacing.two },
+  titel: { fontFamily: Schrift.halbfett, fontSize: 13 },
 });

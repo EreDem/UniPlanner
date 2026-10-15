@@ -1,4 +1,11 @@
-import { formatierePunkte, formatiereProzent, lesePunkte, pruefePunkte, summierePunkte } from '@/model/angaben';
+import {
+  formatierePunkte,
+  formatiereProzent,
+  leseGrenzeProzent,
+  lesePunkte,
+  pruefePunkte,
+  summierePunkte,
+} from '@/model/angaben';
 
 describe('summierePunkte', () => {
   it('summiert erreichte und mögliche Punkte und berechnet den Anteil', () => {
@@ -34,9 +41,25 @@ describe('summierePunkte', () => {
     expect(summierePunkte([])).toEqual({ erreicht: 0, max: 0, prozent: null, bewertet: 0 });
   });
 
-  it('zeigt den Anteil mit Komma', () => {
+  it('zeigt den Anteil mit Komma und immer einer Nachkommastelle', () => {
     expect(formatiereProzent(78.3)).toBe('78,3 %');
-    expect(formatiereProzent(100)).toBe('100 %');
+    expect(formatiereProzent(85)).toBe('85,0 %');
+    expect(formatiereProzent(100)).toBe('100,0 %');
+  });
+});
+
+describe('leseGrenzeProzent', () => {
+  it('liest die erste Prozentangabe aus den Zulassungskriterien', () => {
+    expect(leseGrenzeProzent('50 % der Übungspunkte')).toBe(50);
+    expect(leseGrenzeProzent('Mind. 60% und Präsenz')).toBe(60);
+    expect(leseGrenzeProzent('33,3 Prozent der Punkte')).toBe(33.3);
+  });
+
+  it('gibt ohne sinnvolle Prozentangabe null zurück', () => {
+    expect(leseGrenzeProzent(null)).toBeNull();
+    expect(leseGrenzeProzent('')).toBeNull();
+    expect(leseGrenzeProzent('Alle Blätter bestehen')).toBeNull();
+    expect(leseGrenzeProzent('150 % sind unmöglich, 40 % reichen')).toBe(40);
   });
 });
 

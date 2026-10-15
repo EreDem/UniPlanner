@@ -5,7 +5,8 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Spacing } from '@/constants/theme';
+import { useFeldStil } from '@/components/bausteine';
+import { Radius, Schrift, Spacing } from '@/constants/theme';
 import { meldeAenderung } from '@/daten/aenderungen';
 import { speicherePunkte, speichereNotiz } from '@/db/repository';
 import { useTheme } from '@/hooks/use-theme';
@@ -22,7 +23,7 @@ export function NotizFeld({ eventId, anfangswert }: { eventId: string; anfangswe
   }
 
   return (
-    <View style={[styles.notizBox, { backgroundColor: theme.backgroundElement, borderColor: theme.rand }]}>
+    <View style={[styles.notizBox, { backgroundColor: theme.grund, borderColor: theme.feldRand }]}>
       <TextInput
         accessibilityLabel="Notiz"
         value={notiz}
@@ -33,12 +34,12 @@ export function NotizFeld({ eventId, anfangswert }: { eventId: string; anfangswe
         submitBehavior="blurAndSubmit"
         returnKeyType="done"
         placeholder="Kurze Notiz, z. B. „Folien 12–20 fehlen noch“"
-        placeholderTextColor={theme.textSecondary}
+        placeholderTextColor={theme.text2}
         style={[styles.notizEingabe, { color: theme.text }]}
       />
       <Text
         accessibilityLabel={`${notiz.length} von ${MAX_NOTIZ_ZEICHEN} Zeichen`}
-        style={[styles.zaehler, { color: notiz.length >= MAX_NOTIZ_ZEICHEN ? theme.gefahr : theme.textSecondary }]}>
+        style={[styles.zaehler, { color: notiz.length >= MAX_NOTIZ_ZEICHEN ? theme.gefahr : theme.text2 }]}>
         {notiz.length} / {MAX_NOTIZ_ZEICHEN}
       </Text>
     </View>
@@ -52,6 +53,7 @@ export function PunkteFeld({ eventId, anfangswert }: { eventId: string; anfangsw
   const [max, setMax] = useState(formatierePunkte(anfangswert.max));
   const geprueft = pruefePunkte(erreicht, max);
   const fehler = 'fehler' in geprueft ? geprueft.fehler : null;
+  const feldStil = useFeldStil(fehler !== null);
 
   function aendere(neuErreicht: string, neuMax: string) {
     setErreicht(neuErreicht);
@@ -69,15 +71,8 @@ export function PunkteFeld({ eventId, anfangswert }: { eventId: string; anfangsw
       keyboardType="decimal-pad"
       maxLength={8}
       placeholder="–"
-      placeholderTextColor={theme.textSecondary}
-      style={[
-        styles.punkteEingabe,
-        {
-          color: theme.text,
-          backgroundColor: theme.backgroundElement,
-          borderColor: fehler ? theme.gefahr : theme.rand,
-        },
-      ]}
+      placeholderTextColor={theme.text2}
+      style={[feldStil, styles.punkteEingabe]}
     />
   );
 
@@ -85,8 +80,9 @@ export function PunkteFeld({ eventId, anfangswert }: { eventId: string; anfangsw
     <View style={styles.punkte}>
       <View style={styles.punkteZeile}>
         {feld(erreicht, 'Erreichte Punkte', (text) => aendere(text, max))}
-        <Text style={[styles.schraegstrich, { color: theme.textSecondary }]}>/</Text>
+        <Text style={[styles.schraegstrich, { color: theme.text2 }]}>/</Text>
         {feld(max, 'Maximale Punkte', (text) => aendere(erreicht, text))}
+        <Text style={[styles.erklaerung, { color: theme.text2 }]}>erreicht / maximal</Text>
       </View>
       {fehler && <Text style={[styles.fehler, { color: theme.gefahr }]}>{fehler}</Text>}
     </View>
@@ -95,25 +91,24 @@ export function PunkteFeld({ eventId, anfangswert }: { eventId: string; anfangsw
 
 const styles = StyleSheet.create({
   notizBox: {
-    borderRadius: 12,
+    borderRadius: Radius.feld,
     borderWidth: 1,
     paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.two,
-    paddingBottom: Spacing.one,
+    paddingTop: 12,
+    paddingBottom: Spacing.two,
   },
-  notizEingabe: { fontSize: 15, minHeight: 44, textAlignVertical: 'top', padding: 0 },
-  zaehler: { alignSelf: 'flex-end', fontSize: 12 },
-  punkte: { gap: Spacing.one },
-  punkteZeile: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  punkteEingabe: {
-    width: 80,
+  notizEingabe: {
+    fontFamily: Schrift.mittel,
+    fontSize: 15,
     minHeight: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.two,
-    fontSize: 17,
-    textAlign: 'center',
+    textAlignVertical: 'top',
+    padding: 0,
   },
-  schraegstrich: { fontSize: 22 },
-  fehler: { fontSize: 13 },
+  zaehler: { alignSelf: 'flex-end', fontFamily: Schrift.mittel, fontSize: 12 },
+  punkte: { gap: Spacing.one },
+  punkteZeile: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  punkteEingabe: { width: 84, minHeight: 48, fontFamily: Schrift.fett, fontSize: 18, textAlign: 'center' },
+  schraegstrich: { fontFamily: Schrift.normal, fontSize: 22 },
+  erklaerung: { flex: 1, fontFamily: Schrift.mittel, fontSize: 13 },
+  fehler: { fontFamily: Schrift.mittel, fontSize: 13 },
 });

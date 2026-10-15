@@ -31,6 +31,34 @@ export const STATUS_TEXT: Record<Status, string> = {
   verpasst: 'Verpasst',
 };
 
+/** Kurze Erklärung pro Status für die Statusauswahl. `erledigt` bedeutet je nach Typ etwas anderes. */
+export function statusErklaerung(typ: EventTyp, status: Status): string {
+  if (typ === 'vorlesung') return status === 'erledigt' ? 'Nachgearbeitet' : 'Noch nicht nachgearbeitet';
+  switch (status) {
+    case 'angefangen':
+      return 'In Bearbeitung';
+    case 'erledigt':
+      return 'Fertig, aber noch nicht hochgeladen';
+    case 'abgegeben':
+      return 'Hochgeladen, verschwindet aus der Liste';
+    case 'verpasst':
+      return 'Frist verstrichen, keine Abgabe mehr möglich';
+    default:
+      return 'Noch nicht begonnen';
+  }
+}
+
+/** Veranstaltungsarten zu den Kürzeln aus CATEGORIES, z. B. für die Modulseite. */
+export const KUERZEL_TEXT: Readonly<Record<string, string>> = {
+  VO: 'Vorlesung',
+  VU: 'Vorlesung mit Übung',
+  TU: 'Tutorium',
+  UE: 'Übung',
+  PR: 'Praktikum',
+  SE: 'Seminar',
+  PS: 'Proseminar',
+};
+
 export interface Modul {
   /** Slug des Namens, z. B. `datenbanken`. */
   id: string;
@@ -245,6 +273,22 @@ export function istErledigt(typ: EventTyp, status: Status): boolean {
  */
 export function istAbgeschlossen(typ: EventTyp, status: Status): boolean {
   return istErledigt(typ, status) || (typ === 'abgabe' && status === 'verpasst');
+}
+
+/** Hat das Event einen Status (und damit eine Checkbox)? Übungen, Tutorien usw. nicht. */
+export function hatStatus(event: TitelInfo): boolean {
+  return event.typ === 'abgabe' || istVorlesung(event);
+}
+
+/**
+ * Status nach einem Tipp auf die Checkbox. Abgehakt ist ein Event genau dann, wenn es erledigt ist
+ * (siehe `istErledigt`), egal ob per Checkbox oder über die Statusauswahl. Abhaken setzt den letzten
+ * Status (Abgabe: abgegeben, Vorlesung: erledigt), ein erneuter Tipp setzt den ersten
+ * (ausstehend bzw. nachzuarbeiten).
+ */
+export function statusNachAbhaken(typ: EventTyp, status: Status): Status {
+  if (istErledigt(typ, status)) return STATUS_WERTE[typ][0];
+  return typ === 'abgabe' ? 'abgegeben' : 'erledigt';
 }
 
 /** Moodle-Event vor dem Startdatum? Solche Events zeigt die App nirgends an. */

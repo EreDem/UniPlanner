@@ -1,15 +1,15 @@
-// Schwebendes Popup in der Mitte mit den einzelnen Vorlesungen eines Stapels,
-// im selben Zeilen-Design wie im Bereich, aus dem der Stapel stammt.
+// Schwebendes Popup in der Mitte mit den einzelnen Vorlesungen eines Stapels.
 
 import type { ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RueckgaengigLeiste } from '@/components/rueckgaengig-leiste';
 import { ToDoZeile } from '@/components/todo-zeile';
 import { modulFarbe } from '@/constants/farben';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Radius, Schrift, Spacing } from '@/constants/theme';
+import { useSchema, useTheme } from '@/hooks/use-theme';
 import type { BereichSchluessel, ToDoEintrag } from '@/model/types';
 
 export function StapelPopup({
@@ -18,43 +18,50 @@ export function StapelPopup({
   jetztMs,
   onZeile,
   onStatus,
+  onAbhaken,
   onSchliessen,
   children,
 }: {
   /** Leer = geschlossen. */
   eintraege: ToDoEintrag[];
-  /** Bereich, aus dem der Stapel stammt (Zeilen-Design und Überschrift). */
+  /** Bereich, aus dem der Stapel stammt (Überschrift). */
   bereich: BereichSchluessel;
   jetztMs: number;
   onZeile: (eintrag: ToDoEintrag) => void;
   onStatus: (eintrag: ToDoEintrag) => void;
+  onAbhaken: (eintrag: ToDoEintrag) => void;
   onSchliessen: () => void;
   /** Wird im Popup gerendert, z. B. die Statusauswahl, damit sie darüber erscheint. */
   children?: ReactNode;
 }) {
   const theme = useTheme();
+  const schema = useSchema();
   const abstandUnten = useSafeAreaInsets().bottom;
   const erster = eintraege[0];
 
   return (
     <Modal visible={eintraege.length > 0} transparent animationType="fade" onRequestClose={onSchliessen}>
-      <View style={styles.flaeche}>
+      <View style={[styles.flaeche, { backgroundColor: theme.schleier }]}>
         <Pressable accessibilityLabel="Schließen" style={StyleSheet.absoluteFill} onPress={onSchliessen} />
         {erster && (
-          <View style={[styles.karte, { backgroundColor: theme.background, borderColor: theme.rand }]}>
+          <Animated.View entering={ZoomIn.duration(180)} style={[styles.karte, { backgroundColor: theme.grund }]}>
             <View style={styles.kopf}>
-              <View style={[styles.punkt, { backgroundColor: modulFarbe(erster.event.modulId) }]} />
+              <View style={[styles.punkt, { backgroundColor: modulFarbe(erster.event.modulId, schema) }]} />
               <View style={styles.kopfText}>
                 <Text numberOfLines={1} style={[styles.titel, { color: theme.text }]}>
                   {erster.modul?.name ?? 'Ohne Modul'}
                 </Text>
-                <Text style={[styles.untertitel, { color: theme.textSecondary }]}>
+                <Text style={[styles.untertitel, { color: theme.text2 }]}>
                   {eintraege.length === 1 ? '1 Vorlesung' : `${eintraege.length} Vorlesungen`}{' '}
                   {bereich === 'erledigte-vorlesungen' ? 'erledigt' : 'nachzuarbeiten'}
                 </Text>
               </View>
-              <Pressable accessibilityRole="button" hitSlop={12} onPress={onSchliessen}>
-                <Text style={[styles.schliessen, { color: theme.akzent }]}>Fertig</Text>
+              <Pressable
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={onSchliessen}
+                style={({ pressed }) => [styles.fertig, { backgroundColor: theme.flaeche2, opacity: pressed ? 0.7 : 1 }]}>
+                <Text style={[styles.fertigText, { color: theme.text }]}>Fertig</Text>
               </Pressable>
             </View>
             <ScrollView contentContainerStyle={styles.liste}>
@@ -64,12 +71,14 @@ export function StapelPopup({
                   eintrag={eintrag}
                   bereich={bereich}
                   jetztMs={jetztMs}
+                  kompakt
                   onPress={() => onZeile(eintrag)}
                   onStatusPress={() => onStatus(eintrag)}
+                  onAbhaken={() => onAbhaken(eintrag)}
                 />
               ))}
             </ScrollView>
-          </View>
+          </Animated.View>
         )}
       </View>
       <RueckgaengigLeiste abstandUnten={abstandUnten + Spacing.three} />
@@ -79,35 +88,24 @@ export function StapelPopup({
 }
 
 const styles = StyleSheet.create({
-  flaeche: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.three,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
+  flaeche: { flex: 1, justifyContent: 'center', paddingHorizontal: Spacing.three },
   karte: {
     maxHeight: '75%',
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingTop: Spacing.three,
+    borderRadius: Radius.popup,
+    padding: 12,
     overflow: 'hidden',
-    elevation: 12,
+    elevation: 16,
     shadowColor: '#000',
     shadowOpacity: 0.3,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
   },
-  kopf: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.two,
-  },
+  kopf: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 6, paddingBottom: 12 },
   punkt: { width: 10, height: 10, borderRadius: 5 },
   kopfText: { flex: 1 },
-  titel: { fontSize: 17, fontWeight: '600' },
-  untertitel: { fontSize: 13 },
-  schliessen: { fontSize: 15, fontWeight: '600' },
-  liste: { paddingBottom: Spacing.two },
+  titel: { fontFamily: Schrift.fett, fontSize: 17, lineHeight: 22 },
+  untertitel: { fontFamily: Schrift.mittel, fontSize: 13 },
+  fertig: { minHeight: 36, borderRadius: Radius.feld, paddingHorizontal: 14, justifyContent: 'center' },
+  fertigText: { fontFamily: Schrift.fett, fontSize: 14 },
+  liste: { gap: Spacing.two },
 });

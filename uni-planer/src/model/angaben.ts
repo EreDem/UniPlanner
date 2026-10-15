@@ -77,9 +77,22 @@ export function summierePunkte(liste: readonly Punkte[]): PunkteSumme {
   };
 }
 
-/** 78.3 → „78,3 %“. */
+/** 78.3 → „78,3 %“, 85 → „85,0 %“. */
 export function formatiereProzent(prozent: number): string {
-  return `${String(prozent).replace('.', ',')} %`;
+  return `${prozent.toFixed(1).replace('.', ',')} %`;
+}
+
+/**
+ * Liest eine Prozentgrenze aus den Zulassungskriterien, z. B. 50 aus „50 % der Übungspunkte“.
+ * Nimmt die erste Angabe zwischen 0 und 100 %, sonst `null`.
+ */
+export function leseGrenzeProzent(zulassungskriterien: string | null): number | null {
+  if (!zulassungskriterien) return null;
+  for (const treffer of zulassungskriterien.matchAll(/(\d{1,3}(?:[.,]\d+)?)\s*(?:%|prozent)/gi)) {
+    const wert = Number(treffer[1].replace(',', '.'));
+    if (wert > 0 && wert <= 100) return wert;
+  }
+  return null;
 }
 
 function runde(wert: number, stellen: number): number {

@@ -1,5 +1,6 @@
 // Alle Lese- und Schreibzugriffe auf die Datenbank.
 
+import type { Erscheinungsbild } from '@/daten/erscheinungsbild';
 import { slug, type ImportErgebnis } from '@/import/verarbeite';
 import {
   MAX_MODUL_ANGABE_ZEICHEN,
@@ -301,6 +302,7 @@ const SCHLUESSEL = {
   letzterAbruf: 'letzter_abruf_ms',
   letzterFehler: 'letzter_abruf_fehler',
   beispieldaten: 'beispieldaten',
+  erscheinungsbild: 'erscheinungsbild',
 } as const;
 
 async function ladeWerte(db: Db): Promise<Map<string, string>> {
@@ -342,6 +344,18 @@ export async function speichereEinstellungen(db: Db, aenderung: Partial<Einstell
   if (aenderung.startdatumMs !== undefined) {
     await setzeWert(db, SCHLUESSEL.startdatum, aenderung.startdatumMs === null ? null : String(aenderung.startdatumMs));
   }
+}
+
+/** Hell, dunkel oder wie das System (Standard). Liegt nicht in `Einstellungen`, weil es nur die Oberfläche betrifft. */
+export async function ladeErscheinungsbild(db: Db): Promise<Erscheinungsbild> {
+  const zeile = await db.getFirstAsync<{ wert: string }>('SELECT wert FROM einstellung WHERE schluessel = ?', [
+    SCHLUESSEL.erscheinungsbild,
+  ]);
+  return zeile?.wert === 'hell' || zeile?.wert === 'dunkel' ? zeile.wert : 'system';
+}
+
+export async function speichereErscheinungsbild(db: Db, wert: Erscheinungsbild): Promise<void> {
+  await setzeWert(db, SCHLUESSEL.erscheinungsbild, wert === 'system' ? null : wert);
 }
 
 export interface AbrufInfo {

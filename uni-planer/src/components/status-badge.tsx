@@ -1,9 +1,11 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { statusFarben } from '@/constants/farben';
+import { Schrift } from '@/constants/theme';
 import { useSchema } from '@/hooks/use-theme';
 import { STATUS_TEXT, type EventTyp, type Status } from '@/model/types';
 
+/** Status als Pille; antippen öffnet die volle Statusauswahl. */
 export function StatusBadge({
   typ,
   status,
@@ -32,6 +34,6 @@ export function StatusBadge({
 }
 
 const styles = StyleSheet.create({
-  badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  text: { fontSize: 12, fontWeight: '600' },
+  badge: { height: 26, borderRadius: 13, paddingHorizontal: 12, justifyContent: 'center' },
+  text: { fontFamily: Schrift.fett, fontSize: 12 },
 });

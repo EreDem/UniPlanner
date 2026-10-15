@@ -46,12 +46,16 @@ src/daten/              Änderungszähler und Verbindungszustand für die UI
 test/                   Jest-Tests; test/fixtures/beispiel.ics = anonymisierte Beispieldaten
 werkzeuge/              Text-Transformer, damit .sql/.ics in Metro und Jest als String importierbar sind
 docs/datenmodell.md     Diagramme (Mermaid)
+docs/design-briefing.md Briefing für das Design (Aufbau und Funktionen aller Screens)
+design/                 Entwürfe als PDF, Designsystem „Tinte & Signal“
 prototyp.md             Spezifikation des ersten Prototyps
 ```
 
 Schemaänderungen: immer beides anpassen, `schema.sql` und eine neue Datei in `src/db/migrationen/` (in `db.ts` als Upgrade eintragen, `SCHEMA_VERSION` erhöhen). Ein Test prüft, dass ein Upgrade ab Version 1 (Schnappschuss `test/fixtures/schema-v1.sql`, nie ändern) denselben Stand ergibt wie eine Neuinstallation. Im Schema keine Spalten per `DROP COLUMN` entfernen: SQLite scheitert daran bei Kommentaren in `CREATE TABLE`. Migration 6 ist absichtlich leer (Nummer war für den verworfenen RWTHonline-Import vergeben). Migration 7 baut die Tabelle `status` neu auf (neuer Status `verpasst`); CHECK-Bedingungen lassen sich in SQLite nur so ändern.
 
-Plattformen: nur Android und iOS (`platforms` in `app.json`). Web ist bewusst aus: `expo-sqlite` braucht im Browser WebAssembly und bricht den Web-Build ab („Worker chunk not found … expo-sqlite/web/worker.ts“).
+Plattformen: Android und iOS, dazu Web nur zur Fehlersuche (Logs und Screenshots im Browser; Expo Go reicht seit React Native 0.77 keine `console.log` mehr ans Metro-Terminal weiter, und sein Hermes unterstützt keine Auswertung über das DevTools-Protokoll). Web braucht `"output": "single"` (statisches Vorrendern hat keine SQLite-Datenbank) und in `metro.config.js` `.wasm` als Asset sowie die COEP/COOP-Header für `expo-sqlite`; ohne sie scheitert der Build („Worker chunk not found … expo-sqlite/web/worker.ts“). Auf Web fehlen Secure Store und der Datums-/Uhrzeitwähler.
+
+`SQLiteProvider` aus `expo-sqlite` ist mit `memo` umhüllt und ignoriert dabei neue `children`. Props, die sich ändern, deshalb nie aus `RootLayout` durch ihn hindurchreichen (das hat schon einmal zu einem dauerhaft leeren Bildschirm geführt), sondern in den Komponenten darunter per Hook oder Kontext holen.
 
 Tests: `npm test`. Repository-Tests laufen gegen das echte `schema.sql` mit `node:sqlite` (Node ≥ 22.5), sonst werden sie übersprungen.
 
@@ -92,6 +96,7 @@ Zeitzone: Den Berliner UTC-Offset berechnet `src/zeit.ts` selbst (EU-Sommerzeitr
   - Erst `abgegeben` entfernt sie aus der To-do-Liste.
   - `verpasst` = Frist verstrichen, Abgabe nicht mehr möglich (manuell gewählt). Entfernt sie ebenfalls aus der To-do-Liste, sie erscheint aber **nicht** im Erledigt-Tab, nur auf der Modulseite (graues Badge, nicht rot). Mit eingetragener Maximalpunktzahl zählt sie in der Punktesumme mit 0 Punkten.
   - Regeln im Code: `istErledigt` (Erledigt-Tab) und `istAbgeschlossen` (verschwindet aus der To-do-Liste: erledigt oder verpasst) in `src/model/types.ts`.
+- **Abhaken (Checkbox)**: Jede Event-Zeile mit Status hat links einen Kreis in der Modulfarbe. Ein Tipp setzt den letzten Status (Abgabe → `abgegeben`, Vorlesung → `erledigt`), ein Tipp auf einen abgehakten Kreis den ersten (`ausstehend` bzw. `nachzuarbeiten`). Abgehakt angezeigt wird genau dann, wenn `istErledigt` gilt, also auch nach manueller Wahl über die Statusauswahl; „Erledigt“ einer Abgabe (noch nicht hochgeladen) ist nicht abgehakt. Sonst gelten dieselben Regeln wie beim Statuswechsel über das Badge (Rückgängig-Leiste usw.). Beim Stapel hakt der Kreis die gezeigte Vorlesung ab. Regel: `statusNachAbhaken`. Übungen haben keinen Status und statt des Kreises nur einen Farbpunkt (`hatStatus`).
 
 ## To-do-Liste
 
@@ -121,6 +126,18 @@ Listet alle belegten Module (nicht komplett ausgeblendet) mit Kurzübersicht und
 ## Erledigt-Tab
 
 Vier Tabs: To-do, Erledigt, Module, Einstellungen. Der Erledigt-Tab zeigt abgegebene Abgaben und erledigte Vorlesungen, neueste zuerst. Erledigte Vorlesungen werden wie unter „Nachzuarbeiten“ pro Modul gestapelt (Zeile zeigt die neueste, Popup neueste zuerst). Heutige Vorlesungen erscheinen dort erst ab dem nächsten Tag (bis dahin stehen sie unter „Heute“), Vorlesungen, die nur über den Standard `erledigt` sind, erst nach ihrem Ende. Verschwindet ein Eintrag durch eine Statusänderung aus einer der beiden Listen (also nicht unter „Heute“), erscheint unten für 5 Sekunden eine Leiste mit „Rückgängig“; sie stellt den vorher gespeicherten Status wieder her (oder den Standard, wenn keiner gespeichert war).
+
+## Design
+
+Designsystem „Tinte & Signal“, Entwürfe als PDF in `design/` (Dateinamen passen nicht immer zum Inhalt; `08-to-do-laedt.pdf` ist die Übersicht des Designsystems). Grundsatz: Die Oberfläche bleibt ruhig und fast farblos, Farbe trägt nur Bedeutung (Status und Modul).
+
+- Tokens in `src/constants/theme.ts` (`Colors` hell/dunkel, `Schrift`, `Typo`, `Radius`), Status- und Modulfarben in `src/constants/farben.ts` (`statusFarben`, `modulFarbe(id, schema)`). Keine Farbwerte direkt in Screens.
+- Schrift: Figtree (`@expo-google-fonts/figtree`, geladen in `src/app/_layout.tsx`). Gewicht immer über `fontFamily` (`Schrift.fett` usw.), nie über `fontWeight`, sonst greift auf Android die Systemschrift.
+- Icons: `lucide-react-native` (braucht `react-native-svg`), immer über `src/components/icons.ts` importieren (Einzelimporte; der Sammelimport zieht rund 1.900 Icons ins Bundle). Die native Tab-Leiste nutzt SF Symbols bzw. Material Symbols.
+- Bausteine in `src/components/bausteine.tsx` (Knopf, Karte, Hinweis, Chip, Schalter, Segment, `useFeldStil`), Event-Zeile in `todo-zeile.tsx`.
+- Hell/Dunkel: Einstellungen → Darstellung („System“, „Hell“, „Dunkel“, Standard „System“). Gespeichert unter dem Schlüssel `erscheinungsbild` in `einstellung` (`ladeErscheinungsbild`, nicht Teil von `Einstellungen`), aktueller Wert in `src/daten/erscheinungsbild.ts`. Farben immer über `useSchema()`/`useTheme()` holen, nie `useColorScheme()` direkt, sonst folgt die Stelle nur dem System. `setzeErscheinungsbild` setzt zusätzlich `Appearance.setColorScheme`, damit Systemdialoge und Datumswähler mitziehen. Beim Start wird die Wahl vor dem Ausblenden des Startbilds geladen.
+- Datum und Uhrzeit in „Neues Event“ über den Systemwähler (`@react-native-community/datetimepicker`, Zeitzone Europe/Berlin).
+- Auf der Modulseite liest `leseGrenzeProzent` eine Prozentangabe aus den Zulassungskriterien (z. B. „50 % der Übungspunkte“) und zeigt sie als Grenze im Punktebalken.
 
 ## MVP-Umfang
 

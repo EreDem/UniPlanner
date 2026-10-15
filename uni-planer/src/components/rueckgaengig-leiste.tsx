@@ -1,12 +1,12 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 
-import { Spacing } from '@/constants/theme';
+import { Radius, Schrift, Spacing } from '@/constants/theme';
 import { schliesseRueckgaengig, useRueckgaengig } from '@/daten/rueckgaengig';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Höhe der Leiste, damit z. B. der „+“-Knopf darüber ausweichen kann. */
-export const LEISTE_HOEHE = 48;
+export const LEISTE_HOEHE = 52;
 
 export function RueckgaengigLeiste({ abstandUnten }: { abstandUnten: number }) {
   const meldung = useRueckgaengig();
@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     left: Spacing.three,
     right: Spacing.three,
     minHeight: LEISTE_HOEHE,
-    borderRadius: 10,
+    borderRadius: Radius.knopf,
     paddingHorizontal: Spacing.three,
     flexDirection: 'row',
     alignItems: 'center',
@@ -50,9 +50,9 @@ const styles = StyleSheet.create({
     elevation: 6,
     shadowColor: '#000',
     shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
   },
-  text: { flex: 1, fontSize: 14 },
-  aktion: { fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  text: { flex: 1, fontFamily: Schrift.halbfett, fontSize: 14 },
+  aktion: { fontFamily: Schrift.fett, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.8 },
 });

@@ -1,20 +1,21 @@
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import { ArrowUpRight, Plus } from '@/components/icons';
 import { useState } from 'react';
-import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Hinweis } from '@/components/bausteine';
 import { BereichsListe, ListenKopf, ListenLeer } from '@/components/bereichs-liste';
 import { LEISTE_HOEHE, RueckgaengigLeiste } from '@/components/rueckgaengig-leiste';
-import { BottomTabInset, Spacing } from '@/constants/theme';
+import { BottomTabInset, Radius, Schrift, Spacing, Typo } from '@/constants/theme';
 import { meldeAenderung } from '@/daten/aenderungen';
 import { useRueckgaengig } from '@/daten/rueckgaengig';
 import { useVerbindung } from '@/daten/verbindung';
 import type { AbrufInfo } from '@/db/repository';
 import { useListenDaten } from '@/hooks/use-listen-daten';
-import { useTheme } from '@/hooks/use-theme';
+import { useSchema, useTheme } from '@/hooks/use-theme';
 import { importiere } from '@/import/importiere';
 import { baueToDoListe } from '@/model/types';
 import { moodleStartseite } from '@/speicher/moodleLink';
@@ -25,6 +26,7 @@ const ABSTAND_UNTEN = BottomTabInset + Spacing.three;
 export default function ToDoListe() {
   const db = useSQLiteContext();
   const theme = useTheme();
+  const schema = useSchema();
   const { daten, eingabe, jetzt } = useListenDaten();
   const leisteSichtbar = useRueckgaengig() !== null;
   const verbindung = useVerbindung();
@@ -42,18 +44,28 @@ export default function ToDoListe() {
     }
   }
 
+  const schwebend = schema === 'dark' ? null : styles.schatten;
+
   return (
-    <SafeAreaView edges={['top']} style={[styles.flaeche, { backgroundColor: theme.background }]}>
+    <SafeAreaView edges={['top']} style={[styles.flaeche, { backgroundColor: theme.grund }]}>
       {daten && eingabe && (
         <BereichsListe
           bereiche={baueToDoListe(eingabe)}
           gespeicherterStatus={daten.status}
           jetztMs={jetzt}
           abstandUnten={ABSTAND_UNTEN + 80}
-          refreshControl={<RefreshControl refreshing={aktualisiert} onRefresh={aktualisieren} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={aktualisiert}
+              onRefresh={aktualisieren}
+              colors={[theme.text]}
+              progressBackgroundColor={theme.flaeche}
+              tintColor={theme.text2}
+            />
+          }
           kopf={
             <ListenKopf titel="To-do">
-              <Stand abruf={daten.abruf} jetztMs={jetzt} />
+              <Stand abruf={daten.abruf} jetztMs={jetzt} aktualisiert={aktualisiert} />
             </ListenKopf>
           }
           leer={
@@ -73,16 +85,22 @@ export default function ToDoListe() {
           onPress={() => Linking.openURL(moodleStartseite(verbindung.domain)).catch(() => undefined)}
           style={({ pressed }) => [
             styles.moodle,
-            { backgroundColor: theme.backgroundElement, borderColor: theme.rand, opacity: pressed ? 0.85 : 1 },
+            schwebend,
+            { backgroundColor: theme.flaeche, borderColor: theme.linie, opacity: pressed ? 0.85 : 1 },
           ]}>
-          <Text style={[styles.moodleText, { color: theme.text }]}>Zu Moodle ↗</Text>
+          <Text style={[styles.moodleText, { color: theme.text }]}>Zu Moodle</Text>
+          <ArrowUpRight size={16} color={theme.text} strokeWidth={2.4} />
         </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Event hinzufügen"
           onPress={() => router.push('/neues-event')}
-          style={({ pressed }) => [styles.plus, { backgroundColor: theme.akzent, opacity: pressed ? 0.85 : 1 }]}>
-          <Text style={[styles.plusText, { color: theme.akzentText }]}>+</Text>
+          style={({ pressed }) => [
+            styles.plus,
+            schwebend,
+            { backgroundColor: theme.primaer, opacity: pressed ? 0.85 : 1 },
+          ]}>
+          <Plus size={26} color={theme.primaerText} strokeWidth={2.4} />
         </Pressable>
       </View>
 
@@ -91,19 +109,30 @@ export default function ToDoListe() {
   );
 }
 
-function Stand({ abruf, jetztMs }: { abruf: AbrufInfo; jetztMs: number }) {
+function Stand({ abruf, jetztMs, aktualisiert }: { abruf: AbrufInfo; jetztMs: number; aktualisiert: boolean }) {
   const theme = useTheme();
+  if (aktualisiert) {
+    return (
+      <View style={styles.standZeile}>
+        <ActivityIndicator size="small" color={theme.text2} style={styles.standSpinner} />
+        <Text style={[Typo.details, { color: theme.text2 }]}>Wird aktualisiert …</Text>
+      </View>
+    );
+  }
+
   const stand = abruf.letzterAbrufMs
     ? `Zuletzt aktualisiert: ${vorWieLange(abruf.letzterAbrufMs, jetztMs)}`
     : 'Noch nicht aktualisiert';
 
   return (
     <>
-      <Text style={[styles.stand, { color: theme.textSecondary }]}>
+      <Text style={[Typo.details, { color: theme.text2 }]}>
         {abruf.beispieldaten ? `${stand} · Beispieldaten` : stand}
       </Text>
       {abruf.letzterFehler && (
-        <Hinweis art="fehler">Letzte Aktualisierung fehlgeschlagen: {abruf.letzterFehler}</Hinweis>
+        <Hinweis art="fehler" style={styles.fehler}>
+          <Text style={{ fontFamily: Schrift.fett }}>Letzte Aktualisierung fehlgeschlagen:</Text> {abruf.letzterFehler}
+        </Hinweis>
       )}
     </>
   );
@@ -111,39 +140,33 @@ function Stand({ abruf, jetztMs }: { abruf: AbrufInfo; jetztMs: number }) {
 
 const styles = StyleSheet.create({
   flaeche: { flex: 1 },
-  stand: { fontSize: 13 },
+  standZeile: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  standSpinner: { transform: [{ scale: 0.7 }], marginLeft: -4, marginRight: -2 },
+  fehler: { marginTop: Spacing.two },
   knoepfe: {
     position: 'absolute',
-    right: Spacing.four,
+    right: Spacing.three,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  moodle: {
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingLeft: 22,
+    paddingRight: 18,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
   },
-  moodle: {
-    height: 44,
-    borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
+  moodleText: { fontFamily: Schrift.fett, fontSize: 14 },
+  plus: { width: 56, height: 56, borderRadius: Radius.karte + 2, alignItems: 'center', justifyContent: 'center' },
+  schatten: {
+    shadowColor: '#101828',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
-  moodleText: { fontSize: 15, fontWeight: '600' },
-  plus: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-  },
-  plusText: { fontSize: 30, lineHeight: 32, fontWeight: '400' },
 });

@@ -6,6 +6,7 @@ import {
   ladeAbrufInfo,
   ladeAlleNutzerdaten,
   ladeEinstellungen,
+  ladeErscheinungsbild,
   ladeEvent,
   ladeEvents,
   ladeModulAngaben,
@@ -23,6 +24,7 @@ import {
   setzeModulAusgeblendet,
   setzeStatus,
   speichereEinstellungen,
+  speichereErscheinungsbild,
   speichereImport,
   speichereModulAngabe,
   speichereNotiz,
@@ -378,6 +380,20 @@ async function importiere(db: Db, roh: RohEvent[] = ROH, jetzt = JETZT) {
 
     await speichereEinstellungen(db, { startdatumMs: null });
     expect((await ladeEinstellungen(db)).startdatumMs).toBeNull();
+  });
+
+  it('speichert das Erscheinungsbild, Standard ist das System', async () => {
+    expect(await ladeErscheinungsbild(db)).toBe('system');
+    await speichereErscheinungsbild(db, 'dunkel');
+    expect(await ladeErscheinungsbild(db)).toBe('dunkel');
+    await speichereErscheinungsbild(db, 'hell');
+    expect(await ladeErscheinungsbild(db)).toBe('hell');
+    await speichereErscheinungsbild(db, 'system');
+    expect(await ladeErscheinungsbild(db)).toBe('system');
+
+    await speichereErscheinungsbild(db, 'dunkel');
+    await loescheAlleDaten(db);
+    expect(await ladeErscheinungsbild(db)).toBe('system');
   });
 
   it('löscht alle Daten', async () => {
