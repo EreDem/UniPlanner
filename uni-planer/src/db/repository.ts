@@ -82,6 +82,17 @@ export async function ladeEvent(db: Db, id: string): Promise<UniEvent | null> {
 }
 
 /** Ausblenden durch den Nutzer. Ein späterer Import überschreibt das nicht. */
+/**
+ * Events, die der Nutzer selbst ausgeblendet hat. Vom Import ausgeblendete Öffnungs-Marker
+ * („… opens“, „… beginnt“) gehören nicht dazu.
+ */
+export async function ladeVomNutzerAusgeblendet(db: Db): Promise<UniEvent[]> {
+  const zeilen = await db.getAllAsync<EventZeile>(
+    `SELECT ${EVENT_SPALTEN} FROM event WHERE ausgeblendet = 1 AND ausgeblendet_vom_nutzer = 1 ORDER BY start_ms`,
+  );
+  return zeilen.map(zuEvent);
+}
+
 export async function setzeEventAusgeblendet(db: Db, id: string, ausgeblendet: boolean): Promise<void> {
   await db.runAsync('UPDATE event SET ausgeblendet = ?, ausgeblendet_vom_nutzer = 1 WHERE id = ?', [
     ausgeblendet ? 1 : 0,

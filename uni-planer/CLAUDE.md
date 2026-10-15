@@ -33,7 +33,7 @@ Open Source unter AGPL-3.0. Kommunikation, Doku und Bezeichner im Code sind auf 
 
 ```
 src/app/                Screens (Expo Router): Onboarding, (tabs)/To-do + Erledigt + Module + Einstellungen,
-                        event/[id], modul/[id], neues-event
+                        event/[id], modul/[id], neues-event, ausgeblendet
 src/model/types.ts      Typen und Kernregeln (rein, ohne Expo)
 src/model/angaben.ts    Notiz und Punkte: Grenzen, Eingabe prüfen, Punktesumme (rein)
 src/model/modul-uebersicht.ts  Modulseite: Events nach Kategorie, Punkte pro Modul (rein)
@@ -103,6 +103,8 @@ Zeitzone: Den Berliner UTC-Offset berechnet `src/zeit.ts` selbst (EU-Sommerzeitr
 Einstellungen: Vorlesungen standardmäßig `erledigt`, oder nur Abgaben anzeigen.
 
 Module ausblenden (Einstellungen → Module): Der Schalter am Modul blendet das ganze Modul aus. Aufgeklappt (Pfeil) lassen sich die Kategorien einzeln ausblenden: Vorlesungen, Übungen, Abgaben (`kategorieVon`). „Übungen“ heißt in der App alles, was keine Vorlesung ist (Übung, Tutorium, Praktikum …), vorläufiger Name. Ist das ganze Modul aus, bleiben die Kategorie-Schalter erhalten, sind aber ausgegraut. Gilt für To-do-Liste und Erledigt-Tab; ein Import ändert nichts daran.
+
+Einzelne Events ausblenden: in der Detailansicht („Ausblenden“). Zurückholen über Einstellungen → Ausgeblendet (`ausgeblendet.tsx`): listet alle **vom Nutzer** ausgeblendeten Events nach Datum (`ladeVomNutzerAusgeblendet`, `baueAusgeblendetListe`) mit Knopf „Einblenden“ und Rückgängig-Leiste. Vom Import ausgeblendete Öffnungs-Marker und Events vor dem Startdatum stehen dort bewusst nicht.
 
 Anzeige: Moodle-Vorlesungen heißen überall „Vorlesung“ (`anzeigeTitel`), weil ihr Moodle-Titel meist nur der Kursname ist, der schon als Modul darübersteht. Andere Veranstaltungen (z. B. „Tutorium“) und manuelle Events behalten ihren Titel.
 

@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Abschnittstitel, Fliesstext, Hinweis, Karte, Knopf, OptionZeile } from '@/components/bausteine';
@@ -10,17 +10,29 @@ import { BottomTabInset, Spacing } from '@/constants/theme';
 import { meldeAenderung, useDatenVersion } from '@/daten/aenderungen';
 import { useVerbindung } from '@/daten/verbindung';
 import type { Db } from '@/db/db';
-import { ladeAbrufInfo, ladeEinstellungen, ladeModule, loescheAlleDaten, speichereEinstellungen } from '@/db/repository';
+import {
+  ladeAbrufInfo,
+  ladeEinstellungen,
+  ladeModule,
+  ladeVomNutzerAusgeblendet,
+  loescheAlleDaten,
+  speichereEinstellungen,
+} from '@/db/repository';
 import { useJetzt } from '@/hooks/use-jetzt';
 import { useTheme } from '@/hooks/use-theme';
 import { importiere } from '@/import/importiere';
-import type { Einstellungen } from '@/model/types';
+import { baueAusgeblendetListe, type Einstellungen } from '@/model/types';
 import { loescheMoodleLink } from '@/speicher/moodleLink';
 import { formatiere, vorWieLange } from '@/zeit';
 
 async function ladeDaten(db: Db) {
-  const [einstellungen, module, abruf] = await Promise.all([ladeEinstellungen(db), ladeModule(db), ladeAbrufInfo(db)]);
-  return { einstellungen, module, abruf };
+  const [einstellungen, module, abruf, ausgeblendet] = await Promise.all([
+    ladeEinstellungen(db),
+    ladeModule(db),
+    ladeAbrufInfo(db),
+    ladeVomNutzerAusgeblendet(db),
+  ]);
+  return { einstellungen, module, abruf, ausgeblendet };
 }
 
 export default function EinstellungenScreen() {
@@ -94,7 +106,14 @@ export default function EinstellungenScreen() {
   }
 
   if (!daten) return <View style={{ flex: 1, backgroundColor: theme.background }} />;
-  const { einstellungen, module, abruf } = daten;
+  const { einstellungen, module, abruf, ausgeblendet } = daten;
+  const anzahlAusgeblendet = baueAusgeblendetListe({
+    events: ausgeblendet,
+    module,
+    status: new Map(),
+    einstellungen,
+    jetztMs: jetzt,
+  }).length;
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
@@ -154,6 +173,19 @@ export default function EinstellungenScreen() {
           ))}
         </Karte>
 
+        <Abschnittstitel>Ausgeblendet</Abschnittstitel>
+        <Karte style={styles.engeKarte}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityHint="Zeigt einzeln ausgeblendete Events, um sie wieder einzublenden"
+            onPress={() => router.push('/ausgeblendet')}
+            style={({ pressed }) => [styles.menuZeile, pressed && { backgroundColor: theme.backgroundSelected }]}>
+            <Text style={[styles.schalterText, { color: theme.text }]}>Ausgeblendete Events</Text>
+            <Text style={[styles.menuAnzahl, { color: theme.textSecondary }]}>{anzahlAusgeblendet}</Text>
+            <Text style={[styles.menuPfeil, { color: theme.textSecondary }]}>›</Text>
+          </Pressable>
+        </Karte>
+
         <Abschnittstitel>Aktualisieren</Abschnittstitel>
         <Karte>
           <Fliesstext>
@@ -182,4 +214,14 @@ const styles = StyleSheet.create({
   engeKarte: { paddingVertical: Spacing.one, paddingHorizontal: Spacing.two, gap: 0 },
   schalterZeile: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, minHeight: 44 },
   schalterText: { flex: 1, fontSize: 15 },
+  menuZeile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    minHeight: 48,
+    paddingHorizontal: Spacing.two,
+    borderRadius: 10,
+  },
+  menuAnzahl: { fontSize: 15 },
+  menuPfeil: { fontSize: 22, lineHeight: 24 },
 });

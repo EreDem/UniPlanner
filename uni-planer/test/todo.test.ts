@@ -1,6 +1,7 @@
 import {
   anzeigeTitel,
   artText,
+  baueAusgeblendetListe,
   baueErledigtListe,
   baueToDoListe,
   effektiverStatus,
@@ -254,6 +255,36 @@ describe('baueToDoListe', () => {
 
   it('gibt eine leere Liste zurück, wenn alles erledigt ist', () => {
     expect(liste([])).toEqual([]);
+  });
+});
+
+describe('baueAusgeblendetListe', () => {
+  const versteckt = (e: UniEvent) => event({ ...e, ausgeblendet: true });
+
+  it('listet ausgeblendete Events nach Datum, mit Modul und Status', () => {
+    const eintraege = baueAusgeblendetListe({
+      events: [versteckt(abgabe('spaet', 25)), versteckt(vorlesung('frueh', 13, 10)), versteckt(abgabe('mitte', 19))],
+      module: MODULE,
+      status: new Map<string, Status>([['frueh', 'erledigt']]),
+      einstellungen: STANDARD_EINSTELLUNGEN,
+      jetztMs: JETZT,
+    });
+    expect(eintraege.map((e) => [e.event.id, e.status, e.ueberfaellig, e.modul?.id])).toEqual([
+      ['frueh', 'erledigt', false, 'datenbanken'],
+      ['mitte', 'ausstehend', true, 'datenbanken'],
+      ['spaet', 'ausstehend', false, 'datenbanken'],
+    ]);
+  });
+
+  it('lässt Events vor dem Startdatum und nicht ausgeblendete weg', () => {
+    const eintraege = baueAusgeblendetListe({
+      events: [versteckt(abgabe('vor-start', 12)), versteckt(abgabe('danach', 22)), abgabe('sichtbar', 22)],
+      module: MODULE,
+      status: new Map(),
+      einstellungen: { ...STANDARD_EINSTELLUNGEN, startdatumMs: zeit(19, 0) },
+      jetztMs: JETZT,
+    });
+    expect(eintraege.map((e) => e.event.id)).toEqual(['danach']);
   });
 });
 

@@ -49,6 +49,7 @@ function Navigation() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="event/[id]" options={{ title: 'Details' }} />
           <Stack.Screen name="modul/[id]" options={{ title: 'Modul' }} />
+          <Stack.Screen name="ausgeblendet" options={{ title: 'Ausgeblendet' }} />
           <Stack.Screen name="neues-event" options={{ presentation: 'modal', title: 'Neues Event' }} />
         </Stack.Protected>
         <Stack.Screen name="onboarding" options={{ title: 'Moodle verbinden' }} />

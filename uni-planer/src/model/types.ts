@@ -317,6 +317,31 @@ export function baueToDoListe(eingabe: ToDoEingabe): ToDoBereich[] {
 }
 
 /**
+ * Baut die Liste „Ausgeblendet“ (Einstellungen): vom Nutzer ausgeblendete Events, nach Datum.
+ * `eingabe.events` sind nur diese Events (siehe `ladeVomNutzerAusgeblendet`). Events vor dem
+ * Startdatum fehlen, weil sie auch eingeblendet nirgends erscheinen würden.
+ */
+export function baueAusgeblendetListe(
+  eingabe: Pick<ToDoEingabe, 'events' | 'module' | 'status' | 'einstellungen' | 'jetztMs'>,
+): ToDoEintrag[] {
+  const { einstellungen, jetztMs } = eingabe;
+  const modulNachId = new Map(eingabe.module.map((modul) => [modul.id, modul]));
+
+  return eingabe.events
+    .filter((event) => event.ausgeblendet && !istVorStartdatum(event, einstellungen))
+    .map((event) => {
+      const status = effektiverStatus(event.typ, eingabe.status.get(event.id), einstellungen);
+      return {
+        event,
+        modul: event.modulId ? (modulNachId.get(event.modulId) ?? null) : null,
+        status,
+        ueberfaellig: event.typ === 'abgabe' && !istAbgeschlossen(event.typ, status) && event.startMs < jetztMs,
+      };
+    })
+    .sort(nachBeginn);
+}
+
+/**
  * Baut den Erledigt-Tab: abgegebene Abgaben und erledigte Vorlesungen, jeweils neueste zuerst.
  * Andere Veranstaltungen (Übung, Tutorium …) haben keinen Status und fehlen hier.
  * Heutige Vorlesungen fehlen, sie stehen bis Tagesende unter „Heute“ in der To-do-Liste.

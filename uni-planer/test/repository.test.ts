@@ -12,6 +12,7 @@ import {
   ladeModule,
   ladeNutzerdaten,
   ladeStatus,
+  ladeVomNutzerAusgeblendet,
   legeManuellesEventAn,
   legeModulAn,
   loescheAlleDaten,
@@ -291,6 +292,20 @@ async function importiere(db: Db, roh: RohEvent[] = ROH, jetzt = JETZT) {
 
     await importiere(db, ROH, spaeter);
     expect((await ladeEvent(db, uid(2010)))!.entferntMs).toBeNull();
+  });
+
+  it('liefert nur vom Nutzer ausgeblendete Events, keine Öffnungs-Marker', async () => {
+    await importiere(db);
+    // 2009 „Gruppenanmeldung beginnt“ ist vom Import ausgeblendet und gehört nicht dazu.
+    expect(await ladeVomNutzerAusgeblendet(db)).toEqual([]);
+
+    await setzeEventAusgeblendet(db, uid(2008), true);
+    await setzeEventAusgeblendet(db, uid(2001), true);
+    expect((await ladeVomNutzerAusgeblendet(db)).map((e) => e.id)).toEqual([uid(2001), uid(2008)]);
+
+    await setzeEventAusgeblendet(db, uid(2001), false);
+    await importiere(db);
+    expect((await ladeVomNutzerAusgeblendet(db)).map((e) => e.id)).toEqual([uid(2008)]);
   });
 
   it('überschreibt ausgeblendet nicht, wenn der Nutzer es gesetzt hat', async () => {

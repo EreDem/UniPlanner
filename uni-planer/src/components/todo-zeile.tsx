@@ -15,6 +15,7 @@ export function ToDoZeile({
   onStatusPress,
   anzahl,
   zusatz,
+  aktion,
 }: {
   eintrag: ToDoEintrag;
   bereich: BereichSchluessel;
@@ -25,6 +26,8 @@ export function ToDoZeile({
   anzahl?: number;
   /** Zusätzliche Zeile unter den Details, z. B. die Punkte einer Abgabe. */
   zusatz?: string;
+  /** Rechts ein Knopf statt des Status-Badges, z. B. „Einblenden“. */
+  aktion?: { titel: string; onPress: () => void };
 }) {
   const theme = useTheme();
   const schema = useSchema();
@@ -37,7 +40,17 @@ export function ToDoZeile({
   const details = [zeit, ...event.raeume].join(' · ');
 
   let rechts = null;
-  if (event.typ === 'vorlesung' && !istVorlesung(event)) {
+  if (aktion) {
+    rechts = (
+      <Pressable
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={aktion.onPress}
+        style={({ pressed }) => [styles.aktion, { backgroundColor: theme.akzent, opacity: pressed ? 0.7 : 1 }]}>
+        <Text style={[styles.aktionText, { color: theme.akzentText }]}>{aktion.titel}</Text>
+      </Pressable>
+    );
+  } else if (event.typ === 'vorlesung' && !istVorlesung(event)) {
     // Übungen, Tutorien usw. haben keinen Status, sie stehen nur unter „Heute“.
   } else if (anzahl === undefined) {
     rechts = <StatusBadge typ={event.typ} status={status} ueberfaellig={ueberfaellig} onPress={onStatusPress} />;
@@ -112,4 +125,6 @@ const styles = StyleSheet.create({
   details: { fontSize: 13, lineHeight: 18 },
   anzahl: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4, minWidth: 32, alignItems: 'center' },
   anzahlText: { fontSize: 13, fontWeight: '700' },
+  aktion: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  aktionText: { fontSize: 13, fontWeight: '600' },
 });
